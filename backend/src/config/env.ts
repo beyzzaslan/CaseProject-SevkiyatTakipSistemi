@@ -9,7 +9,7 @@ const booleanValue = z
 const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   HOST: z.string().min(1).default('0.0.0.0'),
-
+  JWT_SECRET: z.string().min(64),
   DB_SERVER: z.string().min(1),
   DB_PORT: z.coerce.number().int().min(1).max(65535).default(1433),
   DB_NAME: z.string().min(1),
