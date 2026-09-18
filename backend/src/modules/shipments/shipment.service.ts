@@ -22,6 +22,12 @@ export type ActiveShipment = {
   createdAt: Date;
 };
 
+export type AdminShipment = ActiveShipment & {
+  driverId: number;
+  driverName: string;
+  driverEmail: string;
+};
+
 export async function findActiveShipmentByDriverId(
   driverId: number,
 ): Promise<ActiveShipment | null> {
@@ -179,4 +185,42 @@ export async function markShipmentAsArrived(
 
     throw error;
   }
+}
+
+export async function findAllActiveShipments(): Promise<
+  AdminShipment[]
+> {
+  const pool = await getDatabasePool();
+
+  const shipmentResult = await pool
+    .request()
+    .query<AdminShipment>(`
+      SELECT
+        shipments.id,
+        shipments.vehicle_id AS vehicleId,
+        vehicles.plate_number AS plateNumber,
+        shipments.material_name AS materialName,
+        shipments.status,
+        shipments.queue_number AS queueNumber,
+        shipments.arrival_time AS arrivalTime,
+        shipments.created_at AS createdAt,
+        users.id AS driverId,
+        users.full_name AS driverName,
+        users.email AS driverEmail
+      FROM dbo.shipments AS shipments
+      INNER JOIN dbo.vehicles AS vehicles
+        ON vehicles.id = shipments.vehicle_id
+      INNER JOIN dbo.users AS users
+        ON users.id = vehicles.driver_id
+      WHERE shipments.status <> 'TAMAMLANDI'
+      ORDER BY
+        CASE
+          WHEN shipments.status = 'YOLDA' THEN 1
+          ELSE 0
+        END,
+        shipments.queue_number,
+        shipments.created_at;
+    `);
+
+  return shipmentResult.recordset;
 }

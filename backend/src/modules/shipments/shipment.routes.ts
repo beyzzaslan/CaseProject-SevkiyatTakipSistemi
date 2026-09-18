@@ -1,13 +1,42 @@
 import { Router } from "express";
 
-import { requireAuth } from "../../middleware/auth.middleware.js";
 import {
+  requireAuth,
+  requireRole,
+} from "../../middleware/auth.middleware.js";import {
   ShipmentNotFoundError,
   ShipmentStatusConflictError,
   findActiveShipmentByDriverId,
+  findAllActiveShipments,
   markShipmentAsArrived,
 } from "./shipment.service.js";
 export const shipmentRouter = Router();
+
+shipmentRouter.get(
+  "/admin/active",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (_request, response) => {
+    try {
+      const shipments =
+        await findAllActiveShipments();
+
+      response.status(200).json({
+        shipments,
+      });
+    } catch (error) {
+      console.error(
+        "Admin shipment list request failed:",
+        error,
+      );
+
+      response.status(500).json({
+        message:
+          "Sevkiyat listesi alınırken bir hata oluştu.",
+      });
+    }
+  },
+);
 
 shipmentRouter.get(
   "/active",

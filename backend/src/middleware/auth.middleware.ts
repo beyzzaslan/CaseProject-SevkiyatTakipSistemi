@@ -7,8 +7,7 @@ import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
 
-type UserRole = "DRIVER" | "ADMIN";
-
+export type UserRole = "DRIVER" | "ADMIN";
 function isUserRole(value: unknown): value is UserRole {
   return value === "DRIVER" || value === "ADMIN";
 }
@@ -72,4 +71,30 @@ export function requireAuth(
   } catch {
     sendUnauthorized(response);
   }
+}
+
+export function requireRole(
+  ...allowedRoles: UserRole[]
+) {
+  return function roleMiddleware(
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ): void {
+    const auth = request.auth;
+
+    if (!auth) {
+      sendUnauthorized(response);
+      return;
+    }
+
+    if (!allowedRoles.includes(auth.role)) {
+      response.status(403).json({
+        message: "Bu işlem için yetkiniz yok.",
+      });
+      return;
+    }
+
+    next();
+  };
 }
