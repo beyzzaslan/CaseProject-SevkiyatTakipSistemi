@@ -14,7 +14,7 @@ import type { RootStackParamList } from "../navigation/types";
 
 import { ApiError } from "../services/api";
 import { login } from "../services/authService";
-
+import { saveSession } from "../services/sessionStorage";
 type LoginScreenProps = NativeStackScreenProps<RootStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: LoginScreenProps) {
@@ -42,8 +42,19 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
       setIsSubmitting(true);
 
       const result = await login(form);
+      await saveSession(result);
 
-      Alert.alert("Giriş başarılı", `Hoş geldiniz ${result.user.fullName}.`);
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: "DriverHome",
+            params: {
+              user: result.user,
+            },
+          },
+        ],
+      });
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -162,6 +173,7 @@ const styles = StyleSheet.create({
   loginButtonDisabled: {
     opacity: 0.6,
   },
+
   loginButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
