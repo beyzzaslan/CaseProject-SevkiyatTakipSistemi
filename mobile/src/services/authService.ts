@@ -1,10 +1,11 @@
+import { apiGet, apiPost } from "./api";
+
 import type {
   AuthResponse,
+  AuthUser,
   LoginRequest,
   RegisterRequest,
-} from '../types/auth';
-
-import { apiPost } from './api';
+} from "../types/auth";
 
 export function register(
   request: RegisterRequest,
@@ -22,4 +23,19 @@ export function login(
     '/auth/login',
     request,
   );
+}
+
+type CurrentUserResponse = {
+  user: AuthUser;
+};
+
+export async function getCurrentUser(
+  token: string,
+): Promise<AuthUser> {
+  const response = await apiGet<CurrentUserResponse>(
+    "/auth/me",
+    token,
+  );
+
+  return response.user;
 }
