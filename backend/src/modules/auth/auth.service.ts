@@ -229,3 +229,24 @@ export async function loginUser(
     user,
   };
 }
+
+export async function findUserById(
+  userId: number,
+): Promise<RegisteredUser | null> {
+  const pool = await getDatabasePool();
+
+  const userResult = await pool
+    .request()
+    .input("userId", sql.Int, userId)
+    .query<RegisteredUser>(`
+      SELECT TOP (1)
+        id,
+        full_name AS fullName,
+        email,
+        role
+      FROM dbo.users
+      WHERE id = @userId;
+    `);
+
+  return userResult.recordset[0] ?? null;
+}
