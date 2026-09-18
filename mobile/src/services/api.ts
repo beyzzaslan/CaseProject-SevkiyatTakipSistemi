@@ -81,10 +81,12 @@ async function apiRequest<TResponse>(
 export function apiPost<TResponse>(
   path: string,
   body: unknown,
+  token?: string,
 ): Promise<TResponse> {
   return apiRequest<TResponse>(path, {
     method: "POST",
     body,
+    token,
   });
 }
 

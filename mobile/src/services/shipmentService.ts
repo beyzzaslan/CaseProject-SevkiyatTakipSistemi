@@ -1,9 +1,6 @@
-import type {
-  ActiveShipment,
-  ActiveShipmentResponse,
-} from "../types/shipment";
+import type { ActiveShipment, ActiveShipmentResponse } from "../types/shipment";
 
-import { apiGet } from "./api";
+import { apiGet,apiPost } from "./api";
 
 export async function getActiveShipment(
   token: string,
@@ -12,6 +9,25 @@ export async function getActiveShipment(
     "/shipments/active",
     token,
   );
+
+  
+  return response.shipment;
+}
+
+
+export async function markShipmentAsArrived(
+  shipmentId: number,
+  token: string,
+): Promise<ActiveShipment> {
+  const response = await apiPost<ActiveShipmentResponse>(
+    `/shipments/${shipmentId}/arrive`,
+    {},
+    token,
+  );
+
+  if (!response.shipment) {
+    throw new Error("Güncel sevkiyat bilgisi alınamadı.");
+  }
 
   return response.shipment;
 }

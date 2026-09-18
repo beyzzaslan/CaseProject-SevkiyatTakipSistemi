@@ -11,7 +11,10 @@ import {
 
 import type { RootStackParamList } from "../navigation/types";
 import { ApiError } from "../services/api";
-import { getActiveShipment } from "../services/shipmentService";
+import {
+  getActiveShipment,
+  markShipmentAsArrived,
+} from "../services/shipmentService";
 import { deleteSession, getSession } from "../services/sessionStorage";
 import type { ActiveShipment, ShipmentStatus } from "../types/shipment";
 
@@ -38,7 +41,7 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
+  const [isMarkingArrived, setIsMarkingArrived] = useState(false);
   const loadActiveShipment = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -80,6 +83,57 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
   useEffect(() => {
     void loadActiveShipment();
   }, [loadActiveShipment]);
+
+  async function handleArrival() {
+    if (!activeShipment || activeShipment.status !== "YOLDA") {
+      return;
+    }
+
+    try {
+      setIsMarkingArrived(true);
+
+      const session = await getSession();
+
+      if (!session) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        });
+        return;
+      }
+
+      const updatedShipment = await markShipmentAsArrived(
+        activeShipment.id,
+        session.token,
+      );
+
+      setActiveShipment(updatedShipment);
+
+      Alert.alert(
+        "Varış bildirildi",
+        `Sıra numaranız: ${updatedShipment.queueNumber}`,
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await deleteSession();
+
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        });
+        return;
+      }
+
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "Varış bildirimi yapılamadı.";
+
+      Alert.alert("İşlem başarısız", message);
+    } finally {
+      setIsMarkingArrived(false);
+    }
+  }
 
   async function handleLogout() {
     try {
@@ -159,6 +213,22 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
                 {activeShipment.queueNumber ?? "-"}
               </Text>
             </View>
+
+            {activeShipment.status === "YOLDA" && (
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.arrivalButton,
+                  isMarkingArrived && styles.arrivalButtonDisabled,
+                ]}
+                onPress={handleArrival}
+                disabled={isMarkingArrived}
+              >
+                <Text style={styles.arrivalButtonText}>
+                  {isMarkingArrived ? "Bildiriliyor..." : "Fabrikaya Geldim"}
+                </Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <View>
@@ -284,6 +354,22 @@ const styles = StyleSheet.create({
   infoValue: {
     color: "#17324D",
     fontSize: 15,
+    fontWeight: "700",
+  },
+
+  arrivalButton: {
+    alignItems: "center",
+    backgroundColor: "#17324D",
+    borderRadius: 10,
+    marginTop: 18,
+    paddingVertical: 15,
+  },
+  arrivalButtonDisabled: {
+    opacity: 0.6,
+  },
+  arrivalButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
     fontWeight: "700",
   },
   emptyTitle: {
