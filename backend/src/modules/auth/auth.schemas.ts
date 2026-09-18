@@ -36,3 +36,18 @@ export const registerBodySchema = z.object({
 });
 
 export type RegisterBody = z.infer<typeof registerBodySchema>;
+export const loginBodySchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Geçerli bir e-posta adresi giriniz.')
+    .max(320, 'E-posta adresi çok uzun.'),
+
+  password: z
+    .string()
+    .min(1, 'Şifre zorunludur.')
+    .max(72, 'Şifre en fazla 72 karakter olabilir.'),
+});
+
+export type LoginBody = z.infer<typeof loginBodySchema>;

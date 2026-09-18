@@ -1,8 +1,14 @@
 import { Router } from 'express';
 
-import { registerBodySchema } from './auth.schemas.js';
 import {
+  loginBodySchema,
+  registerBodySchema,
+} from './auth.schemas.js';
+
+import {
+  InvalidCredentialsError,
   RegistrationConflictError,
+  loginUser,
   registerDriver,
 } from './auth.service.js';
 
@@ -41,6 +47,42 @@ authRouter.post('/register', async (request, response) => {
 
     response.status(500).json({
       message: 'Kayıt işlemi sırasında beklenmeyen bir hata oluştu.',
+    });
+  }
+});
+
+authRouter.post('/login', async (request, response) => {
+  const validationResult = loginBodySchema.safeParse(request.body);
+
+  if (!validationResult.success) {
+    response.status(400).json({
+      message: 'Gönderilen bilgiler geçersiz.',
+      errors: validationResult.error.issues.map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+      })),
+    });
+
+    return;
+  }
+
+  try {
+    const result = await loginUser(validationResult.data);
+
+    response.status(200).json(result);
+  } catch (error) {
+    if (error instanceof InvalidCredentialsError) {
+      response.status(401).json({
+        message: error.message,
+      });
+
+      return;
+    }
+
+    console.error('Login failed:', error);
+
+    response.status(500).json({
+      message: 'Giriş işlemi sırasında beklenmeyen bir hata oluştu.',
     });
   }
 });

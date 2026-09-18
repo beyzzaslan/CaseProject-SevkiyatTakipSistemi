@@ -4,8 +4,10 @@ import sql from 'mssql';
 
 import { env } from '../../config/env.js';
 import { getDatabasePool } from '../../database/connection.js';
-import type { RegisterBody } from './auth.schemas.js';
-
+import type {
+  LoginBody,
+  RegisterBody,
+} from './auth.schemas.js';
 type UserRole = 'DRIVER' | 'ADMIN';
 
 type RegisteredUser = {
@@ -15,7 +17,7 @@ type RegisteredUser = {
   role: UserRole;
 };
 
-export type RegisterResult = {
+export type AuthResult = {
   token: string;
   user: RegisteredUser;
 };
@@ -34,9 +36,16 @@ export class RegistrationConflictError extends Error {
   }
 }
 
+export class InvalidCredentialsError extends Error {
+  constructor() {
+    super('E-posta veya şifre hatalı.');
+    this.name = 'InvalidCredentialsError';
+  }
+}
+
 export async function registerDriver(
   data: RegisterBody,
-): Promise<RegisterResult> {
+): Promise<AuthResult> {
   const passwordHash = await bcrypt.hash(data.password, 12);
   const pool = await getDatabasePool();
   const transaction = new sql.Transaction(pool);
@@ -146,6 +155,62 @@ export async function registerDriver(
 
     throw error;
   }
+
+  const token = jwt.sign(
+    {
+      role: user.role,
+    },
+    env.JWT_SECRET,
+    {
+      algorithm: 'HS256',
+      expiresIn: '8h',
+      subject: String(user.id),
+    },
+  );
+
+  return {
+    token,
+    user,
+  };
+}
+export async function loginUser(
+  data: LoginBody,
+): Promise<AuthResult> {
+  const pool = await getDatabasePool();
+
+  const userResult = await pool
+    .request()
+    .input('email', sql.NVarChar(320), data.email)
+    .query<RegisteredUser & { passwordHash: string }>(`
+      SELECT TOP (1)
+        id,
+        full_name AS fullName,
+        email,
+        role,
+        password_hash AS passwordHash
+      FROM dbo.users
+      WHERE email = @email;
+    `);
+
+  const databaseUser = userResult.recordset[0];
+
+  if (!databaseUser) {
+    throw new InvalidCredentialsError();
+  }
+
+  const passwordMatches = await bcrypt.compare(
+    data.password,
+    databaseUser.passwordHash,
+  );
+
+  if (!passwordMatches) {
+    throw new InvalidCredentialsError();
+  }
+
+  const {
+    passwordHash: _passwordHash,
+    ...user
+  } = databaseUser;
 
   const token = jwt.sign(
     {
