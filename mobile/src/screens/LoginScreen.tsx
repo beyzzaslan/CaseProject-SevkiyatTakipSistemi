@@ -11,6 +11,10 @@ import {
 import type { LoginRequest } from "../types/auth";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/types";
+
+import { ApiError } from "../services/api";
+import { login } from "../services/authService";
+
 type LoginScreenProps = NativeStackScreenProps<RootStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: LoginScreenProps) {
@@ -19,19 +23,37 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
     password: "",
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   function updateField(field: keyof LoginRequest, value: string) {
     setForm((currentForm) => ({
       ...currentForm,
       [field]: value,
     }));
   }
-  function handleLogin() {
+
+  async function handleLogin() {
     if (!form.email.trim() || !form.password.trim()) {
       Alert.alert("Eksik bilgi", "E-posta ve şifre alanlarını doldurun.");
       return;
     }
 
-    Alert.alert("Giriş", "Backend bağlantısını biraz sonra ekleyeceğiz.");
+    try {
+      setIsSubmitting(true);
+
+      const result = await login(form);
+
+      Alert.alert("Giriş başarılı", `Hoş geldiniz ${result.user.fullName}.`);
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "Beklenmeyen bir hata oluştu.";
+
+      Alert.alert("Giriş başarısız", message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -65,10 +87,16 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
 
         <Pressable
           accessibilityRole="button"
-          style={styles.loginButton}
+          style={[
+            styles.loginButton,
+            isSubmitting && styles.loginButtonDisabled,
+          ]}
           onPress={handleLogin}
+          disabled={isSubmitting}
         >
-          <Text style={styles.loginButtonText}>Giriş Yap</Text>
+          <Text style={styles.loginButtonText}>
+            {isSubmitting ? "Giriş yapılıyor..." : "Giriş Yap"}
+          </Text>
         </Pressable>
 
         <Pressable
@@ -129,6 +157,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#17324D",
     borderRadius: 10,
     paddingVertical: 16,
+  },
+
+  loginButtonDisabled: {
+    opacity: 0.6,
   },
   loginButtonText: {
     color: "#FFFFFF",

@@ -7,15 +7,26 @@ import {
   TextInput,
   View,
 } from "react-native";
+
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../navigation/types";
+import { ApiError } from "../services/api";
+import { register } from "../services/authService";
 import type { RegisterRequest } from "../types/auth";
 
-export function RegisterScreen() {
+type RegisterScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "Register"
+>;
+export function RegisterScreen({ navigation }: RegisterScreenProps) {
   const [form, setForm] = useState<RegisterRequest>({
     fullName: "",
     email: "",
     password: "",
     plateNumber: "",
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function updateField(field: keyof RegisterRequest, value: string) {
     setForm((currentForm) => ({
@@ -24,7 +35,7 @@ export function RegisterScreen() {
     }));
   }
 
-  function handleRegister() {
+  async function handleRegister() {
     const hasEmptyField = Object.values(form).some((value) => !value.trim());
 
     if (hasEmptyField) {
@@ -32,15 +43,36 @@ export function RegisterScreen() {
       return;
     }
 
-    if (form.password.length < 6) {
-      Alert.alert("Geçersiz şifre", "Şifre en az 6 karakter olmalıdır.");
+    if (form.password.length < 8) {
+      Alert.alert("Geçersiz şifre", "Şifre en az 8 karakter olmalıdır.");
       return;
     }
 
-    Alert.alert(
-      "Kayıt",
-      "Kayıt API bağlantısını backend hazır olduğunda ekleyeceğiz.",
-    );
+    try {
+      setIsSubmitting(true);
+
+      await register(form);
+
+      Alert.alert(
+        "Kayıt başarılı",
+        "Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.",
+        [
+          {
+            text: "Giriş ekranına dön",
+            onPress: () => navigation.goBack(),
+          },
+        ],
+      );
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "Beklenmeyen bir hata oluştu.";
+
+      Alert.alert("Kayıt başarısız", message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -85,7 +117,7 @@ export function RegisterScreen() {
         <Text style={styles.label}>Şifre</Text>
         <TextInput
           style={styles.input}
-          placeholder="En az 6 karakter"
+          placeholder="En az 8 karakter"
           value={form.password}
           onChangeText={(value) => updateField("password", value)}
           secureTextEntry
@@ -93,10 +125,16 @@ export function RegisterScreen() {
 
         <Pressable
           accessibilityRole="button"
-          style={styles.registerButton}
+          style={[
+            styles.registerButton,
+            isSubmitting && styles.registerButtonDisabled,
+          ]}
           onPress={handleRegister}
+          disabled={isSubmitting}
         >
-          <Text style={styles.registerButtonText}>Kayıt Ol</Text>
+          <Text style={styles.registerButtonText}>
+            {isSubmitting ? "Kaydediliyor..." : "Kayıt Ol"}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -148,6 +186,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#17324D",
     borderRadius: 10,
     paddingVertical: 16,
+  },
+
+  registerButtonDisabled: {
+    opacity: 0.6,
   },
   registerButtonText: {
     color: "#FFFFFF",
