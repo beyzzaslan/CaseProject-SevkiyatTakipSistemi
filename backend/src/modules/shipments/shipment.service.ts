@@ -1,7 +1,7 @@
 import sql from "mssql";
 
 import { getDatabasePool } from "../../database/connection.js";
-
+import type { AdminUpdateShipmentStatusInput } from "./shipment.schemas.js";
 export type ShipmentStatus =
   | "YOLDA"
   | "SIRADA"
@@ -70,6 +70,30 @@ export class ShipmentStatusConflictError extends Error {
     this.name = "ShipmentStatusConflictError";
   }
 }
+
+export class ShipmentStatusTransitionError extends Error {
+  constructor(
+    public readonly currentStatus: ShipmentStatus,
+    public readonly requestedStatus: ShipmentStatus,
+  ) {
+    super(
+      `Sevkiyat ${currentStatus} durumundan ${requestedStatus} durumuna geçirilemez.`,
+    );
+
+    this.name = "ShipmentStatusTransitionError";
+  }
+}
+
+const requiredStatusByNextStatus: Record<
+  AdminUpdateShipmentStatusInput["status"],
+  ShipmentStatus
+> = {
+  KANTARA_CAGRILDI: "SIRADA",
+  KANTARDA: "KANTARA_CAGRILDI",
+  BOSALTIMDA: "KANTARDA",
+  BOSALTIM_TAMAMLANDI: "BOSALTIMDA",
+  TAMAMLANDI: "BOSALTIM_TAMAMLANDI",
+};
 
 export async function markShipmentAsArrived(
   shipmentId: number,
@@ -223,4 +247,94 @@ export async function findAllActiveShipments(): Promise<
     `);
 
   return shipmentResult.recordset;
+}
+
+export async function updateShipmentStatusByAdmin(
+  shipmentId: number,
+  nextStatus: AdminUpdateShipmentStatusInput["status"],
+): Promise<Pick<ActiveShipment, "id" | "status">> {
+  const pool = await getDatabasePool();
+  const transaction = new sql.Transaction(pool);
+
+  let transactionStarted = false;
+
+  try {
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    transactionStarted = true;
+
+    const currentShipmentResult = await new sql.Request(
+      transaction,
+    )
+      .input("shipmentId", sql.Int, shipmentId)
+      .query<{ status: ShipmentStatus }>(`
+        SELECT
+          status
+        FROM dbo.shipments WITH (UPDLOCK, HOLDLOCK)
+        WHERE id = @shipmentId;
+      `);
+
+    const currentShipment =
+      currentShipmentResult.recordset[0];
+
+    if (!currentShipment) {
+      throw new ShipmentNotFoundError();
+    }
+
+    const requiredCurrentStatus =
+      requiredStatusByNextStatus[nextStatus];
+
+    if (currentShipment.status !== requiredCurrentStatus) {
+      throw new ShipmentStatusTransitionError(
+        currentShipment.status,
+        nextStatus,
+      );
+    }
+
+    const updatedShipmentResult = await new sql.Request(
+      transaction,
+    )
+      .input("shipmentId", sql.Int, shipmentId)
+      .input("nextStatus", sql.VarChar(30), nextStatus)
+      .query<Pick<ActiveShipment, "id" | "status">>(`
+        UPDATE dbo.shipments
+        SET
+          status = @nextStatus,
+          completed_at =
+            CASE
+              WHEN @nextStatus = 'TAMAMLANDI'
+                THEN SYSUTCDATETIME()
+              ELSE completed_at
+            END,
+          updated_at = SYSUTCDATETIME()
+        OUTPUT
+          INSERTED.id,
+          INSERTED.status
+        WHERE id = @shipmentId;
+      `);
+
+    const updatedShipment =
+      updatedShipmentResult.recordset[0];
+
+    if (!updatedShipment) {
+      throw new ShipmentNotFoundError();
+    }
+
+    await transaction.commit();
+    transactionStarted = false;
+
+    return updatedShipment;
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error(
+          "Status transaction rollback failed:",
+          rollbackError,
+        );
+      }
+    }
+
+    throw error;
+  }
 }
