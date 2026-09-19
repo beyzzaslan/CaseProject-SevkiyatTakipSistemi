@@ -1,27 +1,61 @@
-# Fabrika Hammadde Kabul ve Boşaltım Sıra Sistemi
+<div align="center">
 
-Fabrikaya hammadde getiren araçların tesise geliş, sıra alma, kantar, boşaltım ve çıkış tartımı süreçlerini yöneten bir sistemdir.
+# 🏭 Fabrika Hammadde Kabul ve Boşaltım Sıra Sistemi
 
-Sistem üç ana uygulamadan oluşur:
+**Hammadde taşıyan araçların fabrikaya varış, sıra alma, kantar, boşaltım ve çıkış tartımı süreçlerini uçtan uca yöneten dijital sevkiyat takip platformu.**
 
-- Şoförlerin kullandığı mobil uygulama
-- Fabrika görevlilerinin kullandığı admin web paneli
-- Mobil ve admin uygulamalarına veri sağlayan backend API
+![React Native](https://img.shields.io/badge/Mobile-React%20Native%20%2B%20Expo-61DAFB?logo=react&logoColor=white)
+![React](https://img.shields.io/badge/Admin-React%20%2B%20Vite-646CFF?logo=vite&logoColor=white)
+![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6?logo=typescript&logoColor=white)
+![SQL Server](https://img.shields.io/badge/Database-SQL%20Server-CC2927?logo=microsoftsqlserver&logoColor=white)
+![Docker](https://img.shields.io/badge/Infra-Docker%20Compose-2496ED?logo=docker&logoColor=white)
 
-## Özellikler
+</div>
 
-### Mobil uygulama
+---
 
-- Şoför kaydı
-- Şoför girişi
+## 📑 İçindekiler
+
+- [Genel Bakış](#-genel-bakış)
+- [Özellikler](#-özellikler)
+- [Teknoloji Yığını](#-teknoloji-yığını)
+- [Proje Yapısı](#-proje-yapısı)
+- [Sevkiyat Durum Akışı](#-sevkiyat-durum-akışı)
+- [Gereksinimler](#-gereksinimler)
+- [Kurulum](#-kurulum)
+- [Geliştirme Admin Hesabı](#-geliştirme-admin-hesabı)
+- [Demo Akışı](#-demo-akışı)
+- [Kontrol Komutları](#-kontrol-komutları)
+- [Notlar](#-notlar)
+
+---
+
+## 🎯 Genel Bakış
+
+Sistem, üç ana uygulamadan oluşur:
+
+| Uygulama | Kullanıcı | Görevi |
+|---|---|---|
+| 📱 **Mobil Uygulama** | Şoförler | Sıra alma, sevkiyat takibi, tartım sonuçlarını görüntüleme |
+| 🖥️ **Admin Paneli** | Fabrika görevlileri | Kantar, boşaltım ve sevkiyat tamamlama işlemlerini yönetme |
+| ⚙️ **Backend API** | Mobil ve admin | Kimlik doğrulama, iş kuralları ve veri erişimi |
+
+---
+
+## ✨ Özellikler
+
+### 📱 Mobil Uygulama
+
+- Şoför kaydı ve girişi
 - Güvenli oturum saklama
 - Aktif sevkiyat görüntüleme
-- “Fabrikaya Geldim” ile sıra alma
-- Sıra numarası görüntüleme
-- Sevkiyat durumunu takip etme
-- Tamamlanan işlemin brüt, dara ve net ağırlığını görüntüleme
+- **“Fabrikaya Geldim”** ile sıra alma
+- Sıra numarasını görüntüleme
+- Sevkiyat durumunu otomatik yenilenen ekranla takip etme
+- Tamamlanan işlemin **brüt, dara ve net** ağırlığını görüntüleme
 
-### Admin paneli
+### 🖥️ Admin Paneli
 
 - Admin girişi
 - Aktif sevkiyatları listeleme
@@ -29,14 +63,14 @@ Sistem üç ana uygulamadan oluşur:
 - Brüt ağırlık kaydetme
 - Boşaltımı başlatma ve tamamlama
 - Dara ağırlığı kaydetme
-- Net teslim miktarını hesaplama
+- Net teslim miktarını otomatik hesaplama
 - Sevkiyatı tamamlama
-- Tamamlanan işlemleri görüntüleme
+- Tamamlanan işlemleri geçmiş listesinde görüntüleme
 
-### Backend
+### ⚙️ Backend
 
 - JWT tabanlı kimlik doğrulama
-- DRIVER ve ADMIN rol kontrolü
+- `DRIVER` ve `ADMIN` rol kontrolü
 - Kayıt ve giriş endpoint’leri
 - Sıra numarası oluşturma
 - Sevkiyat durum geçiş kontrolleri
@@ -44,109 +78,107 @@ Sistem üç ana uygulamadan oluşur:
 - Transaction ile güvenli veritabanı işlemleri
 - Mobil ve admin paneli için REST API
 
-## Kullanılan Teknolojiler
+---
 
-### Mobil
+## 🧰 Teknoloji Yığını
 
-- React Native
-- Expo
-- TypeScript
-- React Navigation
-- Expo Secure Store
+| Katman | Teknolojiler |
+|---|---|
+| **Mobil** | React Native, Expo, TypeScript, React Navigation, Expo Secure Store |
+| **Admin** | React, TypeScript, Vite |
+| **Backend** | Node.js, Express, TypeScript, Zod, JWT, bcryptjs, mssql |
+| **Veritabanı** | Microsoft SQL Server, Docker Compose |
 
-### Admin
+---
 
-- React
-- TypeScript
-- Vite
-
-### Backend
-
-- Node.js
-- Express
-- TypeScript
-- Zod
-- JWT
-- bcryptjs
-- mssql
-
-### Veritabanı
-
-- Microsoft SQL Server
-- Docker Compose
-
-## Proje Yapısı
+## 🗂️ Proje Yapısı
 
 ```text
 .
-├── admin/       React admin paneli
-├── backend/     Express REST API
-├── database/    SQL şema ve örnek veri dosyaları
-├── mobile/      Expo React Native mobil uygulaması
-└── compose.yaml SQL Server Docker servisi
+├── admin/          React admin paneli
+├── backend/        Express REST API
+├── database/       SQL şema ve örnek veri dosyaları
+├── mobile/         Expo React Native mobil uygulaması
+└── compose.yaml    SQL Server Docker servisi
 ```
 
-## Gereksinimler
+---
 
-Projeyi çalıştırmak için şunlar kurulmuş olmalıdır:
+## 🔄 Sevkiyat Durum Akışı
 
-- Node.js
-- npm
-- Docker Desktop
-- Android Studio
-- Android Emulator
-- Expo Go
+```mermaid
+stateDiagram-v2
+    [*] --> YOLDA
+    YOLDA --> SIRADA
+    SIRADA --> KANTARA_CAGRILDI
+    KANTARA_CAGRILDI --> KANTARDA
+    KANTARDA --> BOSALTIMDA
+    BOSALTIMDA --> BOSALTIM_TAMAMLANDI
+    BOSALTIM_TAMAMLANDI --> TAMAMLANDI
+    TAMAMLANDI --> [*]
+```
 
-## Kurulum
+```text
+YOLDA → SIRADA → KANTARA_CAGRILDI → KANTARDA → BOSALTIMDA → BOSALTIM_TAMAMLANDI → TAMAMLANDI
+```
 
-### 1. Projeyi indirin
+---
+
+## 📋 Gereksinimler
+
+Projeyi çalıştırmak için aşağıdakilerin kurulu olması gerekir:
+
+- [Node.js](https://nodejs.org/) ve npm
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Android Studio](https://developer.android.com/studio) ve Android Emulator
+- [Expo Go](https://expo.dev/go)
+
+---
+
+## 🚀 Kurulum
+
+> Aşağıdaki komutlar **Windows PowerShell** içindir.
+
+### 1️⃣ Projeyi indirin
 
 ```powershell
 git clone <repository-url>
 cd CaseProject-SevkiyatTakipSistemi
 ```
 
-### 2. Ortam değişkenlerini oluşturun
-
-Proje kökündeki örnek dosyayı kopyalayın:
+### 2️⃣ Ortam değişkenlerini oluşturun
 
 ```powershell
+# Kök dizin
 Copy-Item .env.example .env
-```
 
-Backend örnek dosyasını kopyalayın:
-
-```powershell
+# Backend
 Copy-Item backend\.env.example backend\.env
 ```
 
-Kök `.env` içindeki SQL Server parolası ile `backend/.env` içindeki `DB_PASSWORD` aynı olmalıdır.
+> [!IMPORTANT]
+> - Kök `.env` içindeki SQL Server parolası ile `backend/.env` içindeki `DB_PASSWORD` **aynı olmalıdır**.
+> - `backend/.env` içindeki `JWT_SECRET` **en az 64 karakter** olmalıdır.
 
-`backend/.env` içindeki `JWT_SECRET` en az 64 karakter olmalıdır.
-
-### 3. SQL Server’ı başlatın
-
-Proje kökünde:
+### 3️⃣ SQL Server’ı başlatın
 
 ```powershell
 docker compose up -d
 ```
 
-Kontrol edin:
+Servisin çalıştığını doğrulayın:
 
 ```powershell
 docker compose ps
 ```
 
-### 4. Veritabanı tablolarını oluşturun
-
-Proje kökünde:
+### 4️⃣ Veritabanı tablolarını oluşturun
 
 ```powershell
 Get-Content -Raw .\database\schema.sql | docker exec -i factory-queue-sqlserver bash -c '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -i /dev/stdin'
 ```
 
-### 5. Backend’i kurun ve başlatın
+### 5️⃣ Backend’i kurun ve başlatın
 
 ```powershell
 cd backend
@@ -154,53 +186,41 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Backend şu adreste çalışır:
+| | Adres |
+|---|---|
+| API | `http://localhost:3000` |
+| Sağlık kontrolü | `http://localhost:3000/api/health` |
 
-```text
-http://localhost:3000
-```
+### 6️⃣ Mobil uygulamayı kurun
 
-Sağlık kontrolü:
-
-```text
-http://localhost:3000/api/health
-```
-
-### 6. Mobil uygulamayı kurun
-
-Yeni terminal açın:
+Yeni bir terminal açın:
 
 ```powershell
 cd mobile
 npm.cmd install
 ```
 
-Android emülatörü açtıktan sonra:
+Android emülatörünü açtıktan sonra:
 
 ```powershell
 npm.cmd run android
 ```
 
-Android emülatörü backend’e şu adres üzerinden bağlanır:
+> [!NOTE]
+> Android emülatörü, backend’e `http://10.0.2.2:3000/api` adresi üzerinden bağlanır.
 
-```text
-http://10.0.2.2:3000/api
-```
+### 7️⃣ İlk şoför kaydını oluşturun
 
-### 7. İlk şoför kaydını oluşturun
+Mobil uygulamadaki kayıt ekranından bir şoför hesabı oluşturun. Örnek bilgiler:
 
-Mobil uygulamadaki kayıt ekranından bir şoför hesabı oluşturun.
+| Alan | Değer |
+|---|---|
+| Ad Soyad | `Demo Şoför` |
+| E-posta | `driver@example.com` |
+| Plaka | `34 DEMO 01` |
+| Şifre | `Test12345` |
 
-Örnek:
-
-```text
-Ad Soyad: Demo Şoför
-E-posta: driver@example.com
-Plaka: 34 DEMO 01
-Şifre: Test12345
-```
-
-### 8. Admin ve örnek sevkiyat verisini oluşturun
+### 8️⃣ Admin ve örnek sevkiyat verisini oluşturun
 
 Şoför kaydı tamamlandıktan sonra proje kökünde çalıştırın:
 
@@ -213,9 +233,9 @@ Bu işlem:
 - Geliştirme admin hesabını oluşturur.
 - Aktif sevkiyatı olmayan şoförlere örnek sevkiyat ekler.
 
-### 9. Admin panelini kurun ve başlatın
+### 9️⃣ Admin panelini kurun ve başlatın
 
-Yeni terminal açın:
+Yeni bir terminal açın:
 
 ```powershell
 cd admin
@@ -223,76 +243,55 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Admin paneli:
+Admin paneli: **http://localhost:5173**
 
-```text
-http://localhost:5173
-```
+---
 
-## Geliştirme Admin Hesabı
+## 🔑 Geliştirme Admin Hesabı
 
-```text
-E-posta: admin@factory.local
-Şifre: Admin123!
-```
+| Alan | Değer |
+|---|---|
+| E-posta | `admin@factory.local` |
+| Şifre | `Admin123!` |
 
-Bu hesap yalnızca yerel geliştirme ve demo amacıyla kullanılmalıdır.
+> [!WARNING]
+> Bu hesap yalnızca **yerel geliştirme ve demo** amacıyla kullanılmalıdır. Canlı ortamda mutlaka kaldırılmalı veya değiştirilmelidir.
 
-## Demo Akışı
+---
 
-1. Şoför mobil uygulamadan giriş yapar.
-2. Aktif sevkiyatını görüntüler.
-3. “Fabrikaya Geldim” butonuna basar.
-4. Sistem sıra numarası oluşturur.
-5. Admin panelinde araç sıraya düşer.
-6. Admin aracı kantara çağırır.
-7. Admin aracı kantara alır.
-8. Brüt ağırlık girilir.
-9. Boşaltım başlatılır ve tamamlanır.
-10. Dara ağırlığı girilir.
-11. Sistem net teslim miktarını hesaplar.
-12. Admin sevkiyatı tamamlar.
-13. Sonuç mobil uygulamada görüntülenir.
-14. İşlem admin panelindeki “Tamamlanan İşlemler” bölümüne taşınır.
+## 🎬 Demo Akışı
 
-## Durum Akışı
+| # | Adım | Kim |
+|---|---|---|
+| 1 | Mobil uygulamadan giriş yapar | 🚚 Şoför |
+| 2 | Aktif sevkiyatını görüntüler | 🚚 Şoför |
+| 3 | **“Fabrikaya Geldim”** butonuna basar | 🚚 Şoför |
+| 4 | Sıra numarası oluşturulur, araç admin panelinde sıraya düşer | ⚙️ Sistem |
+| 5 | Aracı kantara çağırır | 🧑‍💼 Admin |
+| 6 | Aracı kantara alır | 🧑‍💼 Admin |
+| 7 | Brüt ağırlığı girer | 🧑‍💼 Admin |
+| 8 | Boşaltımı başlatır ve tamamlar | 🧑‍💼 Admin |
+| 9 | Dara ağırlığını girer | 🧑‍💼 Admin |
+| 10 | Net teslim miktarı hesaplanır | ⚙️ Sistem |
+| 11 | Sevkiyatı tamamlar | 🧑‍💼 Admin |
+| 12 | Sonuç mobil uygulamada görüntülenir | 🚚 Şoför |
+| 13 | İşlem **“Tamamlanan İşlemler”** bölümüne taşınır | 🧑‍💼 Admin |
 
-```text
-YOLDA
-→ SIRADA
-→ KANTARA_CAGRILDI
-→ KANTARDA
-→ BOSALTIMDA
-→ BOSALTIM_TAMAMLANDI
-→ TAMAMLANDI
-```
+---
 
-## Kontrol Komutları
+## ✅ Kontrol Komutları
 
-Backend TypeScript kontrolü:
+| Uygulama | Komut |
+|---|---|
+| **Backend** – TypeScript kontrolü | `cd backend` → `npm.cmd run typecheck` |
+| **Mobil** – TypeScript kontrolü | `cd mobile` → `npx.cmd tsc --noEmit` |
+| **Admin** – Build kontrolü | `cd admin` → `npm.cmd run build` |
 
-```powershell
-cd backend
-npm.cmd run typecheck
-```
+---
 
-Mobil TypeScript kontrolü:
-
-```powershell
-cd mobile
-npx.cmd tsc --noEmit
-```
-
-Admin build kontrolü:
-
-```powershell
-cd admin
-npm.cmd run build
-```
-
-## Notlar
+## 📝 Notlar
 
 - Gerçek parolalar `.env` dosyalarında tutulur.
 - `.env` dosyaları Git’e eklenmez.
 - Tamamlanan sevkiyatlar admin panelinde geçmiş listesinde görüntülenir.
-- Mobil uygulama sevkiyat durumunu belirli aralıklarla otomatik yeniler.
+- Mobil uygulama, sevkiyat durumunu belirli aralıklarla otomatik yeniler.
