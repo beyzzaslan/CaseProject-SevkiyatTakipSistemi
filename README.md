@@ -292,6 +292,5 @@ Admin paneli: **http://localhost:5173**
 ## 📝 Notlar
 
 - Gerçek parolalar `.env` dosyalarında tutulur.
-- `.env` dosyaları Git’e eklenmez.
 - Tamamlanan sevkiyatlar admin panelinde geçmiş listesinde görüntülenir.
 - Mobil uygulama, sevkiyat durumunu belirli aralıklarla otomatik yeniler.
