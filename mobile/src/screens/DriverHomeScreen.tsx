@@ -32,7 +32,15 @@ const STATUS_LABELS: Record<ShipmentStatus, string> = {
   BOSALTIM_TAMAMLANDI: "Boşaltım tamamlandı",
   TAMAMLANDI: "Tamamlandı",
 };
-
+const STATUS_DESCRIPTIONS: Record<ShipmentStatus, string> = {
+  YOLDA: "Fabrikaya ulaştığınızda aşağıdaki butona basın.",
+  SIRADA: "Sıraya alındınız. Kantara çağrılmayı bekleyin.",
+  KANTARA_CAGRILDI: "Kantara çağrıldınız. Lütfen kantara ilerleyin.",
+  KANTARDA: "Tartım işleminiz devam ediyor.",
+  BOSALTIMDA: "Boşaltım işleminiz devam ediyor.",
+  BOSALTIM_TAMAMLANDI: "Boşaltım tamamlandı. Son işlemler yapılıyor.",
+  TAMAMLANDI: "Sevkiyat işleminiz tamamlandı.",
+};
 export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
   const { user } = route.params;
 
@@ -42,46 +50,66 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMarkingArrived, setIsMarkingArrived] = useState(false);
-  const loadActiveShipment = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage(null);
+  const loadActiveShipment = useCallback(
+    async (showLoading = true) => {
+      try {
+        if (showLoading) {
+          setIsLoading(true);
+        }
 
-      const session = await getSession();
+        setErrorMessage(null);
 
-      if (!session) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        });
-        return;
+        const session = await getSession();
+
+        if (!session) {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Login" }],
+          });
+          return;
+        }
+
+        const shipment = await getActiveShipment(session.token);
+
+        setActiveShipment(shipment);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          await deleteSession();
+
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Login" }],
+          });
+          return;
+        }
+
+        const message =
+          error instanceof ApiError
+            ? error.message
+            : "Aktif sevkiyat alınamadı.";
+
+        setErrorMessage(message);
+      } finally {
+        if (showLoading) {
+          setIsLoading(false);
+        }
       }
-
-      const shipment = await getActiveShipment(session.token);
-
-      setActiveShipment(shipment);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        await deleteSession();
-
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        });
-        return;
-      }
-
-      const message =
-        error instanceof ApiError ? error.message : "Aktif sevkiyat alınamadı.";
-
-      setErrorMessage(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigation]);
+    },
+    [navigation],
+  );
 
   useEffect(() => {
     void loadActiveShipment();
+  }, [loadActiveShipment]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      void loadActiveShipment(false);
+    }, 15000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [loadActiveShipment]);
 
   async function handleArrival() {
@@ -185,7 +213,9 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
             <Pressable
               accessibilityRole="button"
               style={styles.retryButton}
-              onPress={loadActiveShipment}
+              onPress={() => {
+                void loadActiveShipment();
+              }}
             >
               <Text style={styles.retryButtonText}>Tekrar dene</Text>
             </Pressable>
@@ -197,6 +227,10 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
                 {STATUS_LABELS[activeShipment.status]}
               </Text>
             </View>
+
+            <Text style={styles.statusMessage}>
+              {STATUS_DESCRIPTIONS[activeShipment.status]}
+            </Text>
 
             <Text style={styles.materialName}>
               {activeShipment.materialName}
@@ -332,6 +366,13 @@ const styles = StyleSheet.create({
     color: "#17324D",
     fontSize: 13,
     fontWeight: "700",
+  },
+
+  statusMessage: {
+    color: "#5F6F7E",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 12,
   },
   materialName: {
     color: "#17324D",

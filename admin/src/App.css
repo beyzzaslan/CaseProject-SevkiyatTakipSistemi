@@ -1,0 +1,266 @@
+.loginPage,
+.dashboardPage {
+  min-height: 100vh;
+  padding: 32px;
+  box-sizing: border-box;
+  background: #f3f6fa;
+  color: #17324d;
+}
+
+.loginPage {
+  display: grid;
+  place-items: center;
+}
+
+.loginCard {
+  width: min(440px, 100%);
+  padding: 40px;
+  box-sizing: border-box;
+  border: 1px solid #dce5ee;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(23, 50, 77, 0.1);
+}
+
+.loginHeading {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #557089;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+h1 {
+  margin: 0 0 10px;
+  color: #17324d;
+  font-size: 32px;
+}
+
+.loginHeading p:last-child,
+.dashboardHeader p,
+.emptyCard p {
+  margin: 0;
+  color: #6b7f92;
+}
+
+.loginForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loginForm label {
+  margin-top: 8px;
+  color: #2d465e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.loginForm input {
+  padding: 14px 16px;
+  border: 1px solid #cad6e2;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #17324d;
+  font: inherit;
+  outline: none;
+}
+
+.loginForm input:focus {
+  border-color: #17324d;
+  box-shadow: 0 0 0 3px rgba(23, 50, 77, 0.1);
+}
+
+.loginButton,
+.logoutButton {
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.loginButton {
+  margin-top: 18px;
+  padding: 14px;
+  border: 0;
+  background: #17324d;
+  color: #ffffff;
+}
+
+.loginButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.errorMessage {
+  margin: 8px 0 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff0f0;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.dashboardPage {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dashboardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.logoutButton {
+  padding: 10px 16px;
+  border: 1px solid #17324d;
+  background: transparent;
+  color: #17324d;
+}
+
+.emptyCard {
+  padding: 32px;
+  border: 1px solid #dce5ee;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.emptyCard h2 {
+  margin-top: 0;
+}
+
+@media (max-width: 600px) {
+  .loginPage,
+  .dashboardPage {
+    padding: 18px;
+  }
+
+  .loginCard {
+    padding: 28px 22px;
+  }
+
+  .dashboardHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.headerActions {
+  display: flex;
+  gap: 10px;
+}
+
+.refreshButton,
+.actionButton {
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.refreshButton {
+  padding: 10px 16px;
+  background: #e6eef6;
+  color: #17324d;
+}
+
+.tableCard {
+  overflow: hidden;
+  border: 1px solid #dce5ee;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.tableHeading {
+  display: flex;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid #e4ebf2;
+}
+
+.tableHeading h2 {
+  margin: 0 0 6px;
+}
+
+.tableHeading p {
+  margin: 0;
+  color: #6b7f92;
+}
+
+.shipmentTableWrapper {
+  overflow-x: auto;
+}
+
+.shipmentTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.shipmentTable th,
+.shipmentTable td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8eef4;
+  vertical-align: middle;
+}
+
+.shipmentTable th {
+  color: #60758a;
+  background: #f8fafc;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+}
+
+.shipmentTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.shipmentTable small {
+  color: #72869a;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e7f0f8;
+  color: #17324d;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.actionButton {
+  padding: 9px 13px;
+  background: #17324d;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.actionButton:disabled,
+.refreshButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.waitingText {
+  color: #7b8d9e;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .headerActions {
+    width: 100%;
+  }
+
+  .headerActions button {
+    flex: 1;
+  }
+}
