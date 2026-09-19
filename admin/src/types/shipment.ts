@@ -26,6 +26,9 @@ export type AdminShipment = {
   driverId: number;
   driverName: string;
   driverEmail: string;
+  grossWeight: number | null;
+tareWeight: number | null;
+netWeight: number | null;
 };
 
 export type AdminShipmentListResponse = {
@@ -38,4 +41,22 @@ export type UpdateShipmentStatusResponse = {
     id: number;
     status: ShipmentStatus;
   };
+};
+
+export type ShipmentWeightKind =
+  | "gross"
+  | "tare";
+
+export type WeighingRecord = {
+  shipmentId: number;
+  grossWeight: number | null;
+  tareWeight: number | null;
+  netWeight: number | null;
+  grossWeighedAt: string | null;
+  tareWeighedAt: string | null;
+};
+
+export type ShipmentWeightResponse = {
+  message: string;
+  weighingRecord: WeighingRecord;
 };

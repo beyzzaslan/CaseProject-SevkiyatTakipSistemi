@@ -4,14 +4,17 @@ import "./App.css";
 import { getCurrentAdmin, loginAdmin } from "./services/authService";
 import {
   getAdminShipments,
+  recordAdminShipmentWeight,
   updateAdminShipmentStatus,
 } from "./services/shipmentService";
 
 import type { AuthUser } from "./types/auth";
+
 import type {
   AdminManagedShipmentStatus,
   AdminShipment,
   ShipmentStatus,
+  ShipmentWeightKind,
 } from "./types/shipment";
 
 const statusLabels: Record<ShipmentStatus, string> = {
@@ -41,6 +44,14 @@ const actionLabels: Partial<Record<ShipmentStatus, string>> = {
   BOSALTIMDA: "Boşaltımı Tamamla",
   BOSALTIM_TAMAMLANDI: "Sevkiyatı Tamamla",
 };
+
+function formatWeight(weight: number | null): string {
+  if (weight === null) {
+    return "-";
+  }
+
+  return `${weight.toLocaleString("tr-TR")} kg`;
+}
 
 function App() {
   const [email, setEmail] = useState("admin@factory.local");
@@ -179,6 +190,45 @@ function App() {
     }
   }
 
+  async function handleWeightEntry(
+    shipment: AdminShipment,
+    kind: ShipmentWeightKind,
+  ) {
+    const label = kind === "gross" ? "brüt ağırlığı" : "dara ağırlığını";
+
+    const enteredValue = window.prompt(
+      `${shipment.plateNumber} plakalı araç için ${label} kilogram olarak girin:`,
+    );
+
+    if (enteredValue === null) {
+      return;
+    }
+
+    const normalizedValue = enteredValue.replace(",", ".");
+
+    const weight = Number(normalizedValue);
+
+    if (!Number.isFinite(weight) || weight <= 0) {
+      setShipmentError("Ağırlık sıfırdan büyük bir sayı olmalıdır.");
+      return;
+    }
+
+    setShipmentError("");
+    setUpdatingShipmentId(shipment.id);
+
+    try {
+      await recordAdminShipmentWeight(shipment.id, kind, weight, token);
+
+      await loadShipments(token);
+    } catch (error) {
+      setShipmentError(
+        error instanceof Error ? error.message : "Ağırlık kaydedilemedi.",
+      );
+    } finally {
+      setUpdatingShipmentId(null);
+    }
+  }
+
   function handleLogout() {
     localStorage.removeItem("adminToken");
 
@@ -309,13 +359,26 @@ function App() {
                   <th>Şoför</th>
                   <th>Malzeme</th>
                   <th>Durum</th>
+                  <th>Kantar</th>
                   <th>İşlem</th>
                 </tr>
               </thead>
 
               <tbody>
                 {shipments.map((shipment) => {
-                  const actionLabel = actionLabels[shipment.status];
+                  const needsGrossWeight =
+                    shipment.status === "KANTARDA" &&
+                    shipment.grossWeight === null;
+
+                  const needsTareWeight =
+                    shipment.status === "BOSALTIM_TAMAMLANDI" &&
+                    shipment.tareWeight === null;
+
+                  const actionLabel = needsGrossWeight
+                    ? "Brüt Ağırlık Gir"
+                    : needsTareWeight
+                      ? "Dara Ağırlığı Gir"
+                      : actionLabels[shipment.status];
 
                   return (
                     <tr key={shipment.id}>
@@ -340,12 +403,38 @@ function App() {
                       </td>
 
                       <td>
+                        <div className="weightValues">
+                          <small>
+                            Brüt: {formatWeight(shipment.grossWeight)}
+                          </small>
+
+                          <small>
+                            Dara: {formatWeight(shipment.tareWeight)}
+                          </small>
+
+                          <small>Net: {formatWeight(shipment.netWeight)}</small>
+                        </div>
+                      </td>
+
+                      <td>
                         {actionLabel ? (
                           <button
                             className="actionButton"
                             type="button"
                             disabled={updatingShipmentId === shipment.id}
-                            onClick={() => handleStatusUpdate(shipment)}
+                            onClick={() => {
+                              if (needsGrossWeight) {
+                                void handleWeightEntry(shipment, "gross");
+                                return;
+                              }
+
+                              if (needsTareWeight) {
+                                void handleWeightEntry(shipment, "tare");
+                                return;
+                              }
+
+                              void handleStatusUpdate(shipment);
+                            }}
                           >
                             {updatingShipmentId === shipment.id
                               ? "Güncelleniyor..."

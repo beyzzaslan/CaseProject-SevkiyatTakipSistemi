@@ -3,6 +3,9 @@ import type {
   AdminShipment,
   AdminShipmentListResponse,
   UpdateShipmentStatusResponse,
+  ShipmentWeightKind,
+ShipmentWeightResponse,
+WeighingRecord,
 } from "../types/shipment";
 
 import { apiRequest } from "./api";
@@ -40,4 +43,27 @@ export async function updateAdminShipmentStatus(
       }),
     },
   );
+}
+
+export async function recordAdminShipmentWeight(
+  shipmentId: number,
+  kind: ShipmentWeightKind,
+  weight: number,
+  token: string,
+): Promise<WeighingRecord> {
+  const response =
+    await apiRequest<ShipmentWeightResponse>(
+      `/shipments/admin/${shipmentId}/weighing/${kind}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          weight,
+        }),
+      },
+    );
+
+  return response.weighingRecord;
 }

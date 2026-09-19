@@ -26,6 +26,20 @@ export type AdminShipment = ActiveShipment & {
   driverId: number;
   driverName: string;
   driverEmail: string;
+  grossWeight: number | null;
+  tareWeight: number | null;
+  netWeight: number | null;
+};
+
+export type ShipmentWeightKind = "gross" | "tare";
+
+export type WeighingRecord = {
+  shipmentId: number;
+  grossWeight: number | null;
+  tareWeight: number | null;
+  netWeight: number | null;
+  grossWeighedAt: Date | null;
+  tareWeighedAt: Date | null;
 };
 
 export async function findActiveShipmentByDriverId(
@@ -35,8 +49,7 @@ export async function findActiveShipmentByDriverId(
 
   const shipmentResult = await pool
     .request()
-    .input("driverId", sql.Int, driverId)
-    .query<ActiveShipment>(`
+    .input("driverId", sql.Int, driverId).query<ActiveShipment>(`
       SELECT TOP (1)
         shipments.id,
         shipments.vehicle_id AS vehicleId,
@@ -55,7 +68,7 @@ export async function findActiveShipmentByDriverId(
       ORDER BY shipments.created_at DESC;
     `);
 
-  return shipmentResult.recordset[0] ?? null;               
+  return shipmentResult.recordset[0] ?? null;
 }
 export class ShipmentNotFoundError extends Error {
   constructor() {
@@ -81,6 +94,16 @@ export class ShipmentStatusTransitionError extends Error {
     );
 
     this.name = "ShipmentStatusTransitionError";
+  }
+}
+
+export class ShipmentWeightConflictError extends Error {
+  constructor(
+    message: string,
+    public readonly currentStatus?: ShipmentStatus,
+  ) {
+    super(message);
+    this.name = "ShipmentWeightConflictError";
   }
 }
 
@@ -110,8 +133,7 @@ export async function markShipmentAsArrived(
 
     const shipmentResult = await new sql.Request(transaction)
       .input("shipmentId", sql.Int, shipmentId)
-      .input("driverId", sql.Int, driverId)
-      .query<{ status: ShipmentStatus }>(`
+      .input("driverId", sql.Int, driverId).query<{ status: ShipmentStatus }>(`
         SELECT TOP (1)
           shipments.status
         FROM dbo.shipments AS shipments
@@ -130,13 +152,12 @@ export async function markShipmentAsArrived(
     }
 
     if (shipment.status !== "YOLDA") {
-      throw new ShipmentStatusConflictError(
-        shipment.status,
-      );
+      throw new ShipmentStatusConflictError(shipment.status);
     }
 
-    const lastQueueResult = await new sql.Request(transaction)
-      .query<{ queueNumber: number }>(`
+    const lastQueueResult = await new sql.Request(transaction).query<{
+      queueNumber: number;
+    }>(`
         SELECT TOP (1)
           queue_number AS queueNumber
         FROM dbo.shipments
@@ -147,15 +168,13 @@ export async function markShipmentAsArrived(
         ORDER BY queue_number DESC;
       `);
 
-    const lastQueueNumber =
-      lastQueueResult.recordset[0]?.queueNumber ?? 0;
+    const lastQueueNumber = lastQueueResult.recordset[0]?.queueNumber ?? 0;
 
     const newQueueNumber = lastQueueNumber + 1;
 
     await new sql.Request(transaction)
       .input("shipmentId", sql.Int, shipmentId)
-      .input("queueNumber", sql.Int, newQueueNumber)
-      .query(`
+      .input("queueNumber", sql.Int, newQueueNumber).query(`
         UPDATE dbo.shipments
         SET
           status = 'SIRADA',
@@ -165,10 +184,11 @@ export async function markShipmentAsArrived(
         WHERE id = @shipmentId;
       `);
 
-    const updatedShipmentResult =
-      await new sql.Request(transaction)
-        .input("shipmentId", sql.Int, shipmentId)
-        .query<ActiveShipment>(`
+    const updatedShipmentResult = await new sql.Request(transaction).input(
+      "shipmentId",
+      sql.Int,
+      shipmentId,
+    ).query<ActiveShipment>(`
           SELECT TOP (1)
             shipments.id,
             shipments.vehicle_id AS vehicleId,
@@ -184,8 +204,7 @@ export async function markShipmentAsArrived(
           WHERE shipments.id = @shipmentId;
         `);
 
-    const updatedShipment =
-      updatedShipmentResult.recordset[0];
+    const updatedShipment = updatedShipmentResult.recordset[0];
 
     if (!updatedShipment) {
       throw new ShipmentNotFoundError();
@@ -200,10 +219,7 @@ export async function markShipmentAsArrived(
       try {
         await transaction.rollback();
       } catch (rollbackError) {
-        console.error(
-          "Arrival transaction rollback failed:",
-          rollbackError,
-        );
+        console.error("Arrival transaction rollback failed:", rollbackError);
       }
     }
 
@@ -211,14 +227,10 @@ export async function markShipmentAsArrived(
   }
 }
 
-export async function findAllActiveShipments(): Promise<
-  AdminShipment[]
-> {
+export async function findAllActiveShipments(): Promise<AdminShipment[]> {
   const pool = await getDatabasePool();
 
-  const shipmentResult = await pool
-    .request()
-    .query<AdminShipment>(`
+  const shipmentResult = await pool.request().query<AdminShipment>(`
       SELECT
         shipments.id,
         shipments.vehicle_id AS vehicleId,
@@ -228,15 +240,20 @@ export async function findAllActiveShipments(): Promise<
         shipments.queue_number AS queueNumber,
         shipments.arrival_time AS arrivalTime,
         shipments.created_at AS createdAt,
-        users.id AS driverId,
-        users.full_name AS driverName,
-        users.email AS driverEmail
+       users.id AS driverId,
+users.full_name AS driverName,
+users.email AS driverEmail,
+weighing.gross_weight AS grossWeight,
+weighing.tare_weight AS tareWeight,
+weighing.net_weight AS netWeight
       FROM dbo.shipments AS shipments
       INNER JOIN dbo.vehicles AS vehicles
         ON vehicles.id = shipments.vehicle_id
-      INNER JOIN dbo.users AS users
-        ON users.id = vehicles.driver_id
-      WHERE shipments.status <> 'TAMAMLANDI'
+     INNER JOIN dbo.users AS users
+  ON users.id = vehicles.driver_id
+LEFT JOIN dbo.weighing_records AS weighing
+  ON weighing.shipment_id = shipments.id
+WHERE shipments.status <> 'TAMAMLANDI'
       ORDER BY
         CASE
           WHEN shipments.status = 'YOLDA' THEN 1
@@ -262,26 +279,24 @@ export async function updateShipmentStatusByAdmin(
     await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
     transactionStarted = true;
 
-    const currentShipmentResult = await new sql.Request(
-      transaction,
-    )
-      .input("shipmentId", sql.Int, shipmentId)
-      .query<{ status: ShipmentStatus }>(`
+    const currentShipmentResult = await new sql.Request(transaction).input(
+      "shipmentId",
+      sql.Int,
+      shipmentId,
+    ).query<{ status: ShipmentStatus }>(`
         SELECT
           status
         FROM dbo.shipments WITH (UPDLOCK, HOLDLOCK)
         WHERE id = @shipmentId;
       `);
 
-    const currentShipment =
-      currentShipmentResult.recordset[0];
+    const currentShipment = currentShipmentResult.recordset[0];
 
     if (!currentShipment) {
       throw new ShipmentNotFoundError();
     }
 
-    const requiredCurrentStatus =
-      requiredStatusByNextStatus[nextStatus];
+    const requiredCurrentStatus = requiredStatusByNextStatus[nextStatus];
 
     if (currentShipment.status !== requiredCurrentStatus) {
       throw new ShipmentStatusTransitionError(
@@ -290,12 +305,51 @@ export async function updateShipmentStatusByAdmin(
       );
     }
 
-    const updatedShipmentResult = await new sql.Request(
-      transaction,
-    )
+    if (nextStatus === "BOSALTIMDA" || nextStatus === "TAMAMLANDI") {
+      const weightResult = await new sql.Request(transaction).input(
+        "shipmentId",
+        sql.Int,
+        shipmentId,
+      ).query<{
+        grossWeight: number | null;
+        tareWeight: number | null;
+      }>(`
+          SELECT
+            gross_weight AS grossWeight,
+            tare_weight AS tareWeight
+          FROM dbo.weighing_records
+            WITH (UPDLOCK, HOLDLOCK)
+          WHERE shipment_id = @shipmentId;
+        `);
+
+      const weighingRecord = weightResult.recordset[0];
+
+      if (
+        nextStatus === "BOSALTIMDA" &&
+        (!weighingRecord || weighingRecord.grossWeight === null)
+      ) {
+        throw new ShipmentWeightConflictError(
+          "Boşaltıma geçmeden önce brüt ağırlık kaydedilmelidir.",
+          currentShipment.status,
+        );
+      }
+
+      if (
+        nextStatus === "TAMAMLANDI" &&
+        (!weighingRecord || weighingRecord.tareWeight === null)
+      ) {
+        throw new ShipmentWeightConflictError(
+          "Sevkiyat tamamlanmadan önce dara ağırlığı kaydedilmelidir.",
+          currentShipment.status,
+        );
+      }
+    }
+
+    const updatedShipmentResult = await new sql.Request(transaction)
       .input("shipmentId", sql.Int, shipmentId)
-      .input("nextStatus", sql.VarChar(30), nextStatus)
-      .query<Pick<ActiveShipment, "id" | "status">>(`
+      .input("nextStatus", sql.VarChar(30), nextStatus).query<
+      Pick<ActiveShipment, "id" | "status">
+    >(`
         UPDATE dbo.shipments
         SET
           status = @nextStatus,
@@ -312,8 +366,7 @@ export async function updateShipmentStatusByAdmin(
         WHERE id = @shipmentId;
       `);
 
-    const updatedShipment =
-      updatedShipmentResult.recordset[0];
+    const updatedShipment = updatedShipmentResult.recordset[0];
 
     if (!updatedShipment) {
       throw new ShipmentNotFoundError();
@@ -328,10 +381,172 @@ export async function updateShipmentStatusByAdmin(
       try {
         await transaction.rollback();
       } catch (rollbackError) {
-        console.error(
-          "Status transaction rollback failed:",
-          rollbackError,
+        console.error("Status transaction rollback failed:", rollbackError);
+      }
+    }
+
+    throw error;
+  }
+}
+
+export async function recordShipmentWeight(
+  shipmentId: number,
+  kind: ShipmentWeightKind,
+  weight: number,
+): Promise<WeighingRecord> {
+  const pool = await getDatabasePool();
+  const transaction = new sql.Transaction(pool);
+
+  let transactionStarted = false;
+
+  try {
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+
+    transactionStarted = true;
+
+    const shipmentResult = await new sql.Request(transaction).input(
+      "shipmentId",
+      sql.Int,
+      shipmentId,
+    ).query<{ status: ShipmentStatus }>(`
+        SELECT
+          status
+        FROM dbo.shipments WITH (UPDLOCK, HOLDLOCK)
+        WHERE id = @shipmentId;
+      `);
+
+    const shipment = shipmentResult.recordset[0];
+
+    if (!shipment) {
+      throw new ShipmentNotFoundError();
+    }
+
+    const requiredStatus: ShipmentStatus =
+      kind === "gross" ? "KANTARDA" : "BOSALTIM_TAMAMLANDI";
+
+    if (shipment.status !== requiredStatus) {
+      throw new ShipmentWeightConflictError(
+        kind === "gross"
+          ? "Brüt ağırlık yalnızca araç kantardayken kaydedilebilir."
+          : "Dara ağırlığı yalnızca boşaltım tamamlandıktan sonra kaydedilebilir.",
+        shipment.status,
+      );
+    }
+
+    if (kind === "gross") {
+      await new sql.Request(transaction)
+        .input("shipmentId", sql.Int, shipmentId)
+        .input("weight", sql.Decimal(12, 2), weight).query(`
+          IF EXISTS (
+            SELECT 1
+            FROM dbo.weighing_records WITH (
+              UPDLOCK,
+              HOLDLOCK
+            )
+            WHERE shipment_id = @shipmentId
+          )
+          BEGIN
+            UPDATE dbo.weighing_records
+            SET
+              gross_weight = @weight,
+              gross_weighed_at = SYSUTCDATETIME(),
+              tare_weight = NULL,
+              tare_weighed_at = NULL,
+              net_weight = NULL,
+              updated_at = SYSUTCDATETIME()
+            WHERE shipment_id = @shipmentId;
+          END
+          ELSE
+          BEGIN
+            INSERT INTO dbo.weighing_records (
+              shipment_id,
+              gross_weight,
+              gross_weighed_at
+            )
+            VALUES (
+              @shipmentId,
+              @weight,
+              SYSUTCDATETIME()
+            );
+          END;
+        `);
+    } else {
+      const existingWeightResult = await new sql.Request(transaction).input(
+        "shipmentId",
+        sql.Int,
+        shipmentId,
+      ).query<{ grossWeight: number | null }>(`
+            SELECT
+              gross_weight AS grossWeight
+            FROM dbo.weighing_records
+              WITH (UPDLOCK, HOLDLOCK)
+            WHERE shipment_id = @shipmentId;
+          `);
+
+      const grossWeight = existingWeightResult.recordset[0]?.grossWeight;
+
+      if (grossWeight === null || grossWeight === undefined) {
+        throw new ShipmentWeightConflictError(
+          "Dara ağırlığından önce brüt ağırlık kaydedilmelidir.",
+          shipment.status,
         );
+      }
+
+      if (weight > grossWeight) {
+        throw new ShipmentWeightConflictError(
+          "Dara ağırlığı brüt ağırlıktan büyük olamaz.",
+          shipment.status,
+        );
+      }
+
+      await new sql.Request(transaction)
+        .input("shipmentId", sql.Int, shipmentId)
+        .input("weight", sql.Decimal(12, 2), weight).query(`
+          UPDATE dbo.weighing_records
+          SET
+            tare_weight = @weight,
+            tare_weighed_at = SYSUTCDATETIME(),
+            net_weight = gross_weight - @weight,
+            updated_at = SYSUTCDATETIME()
+          WHERE shipment_id = @shipmentId;
+        `);
+    }
+
+    const updatedWeightResult = await new sql.Request(transaction).input(
+      "shipmentId",
+      sql.Int,
+      shipmentId,
+    ).query<WeighingRecord>(`
+          SELECT
+            shipment_id AS shipmentId,
+            gross_weight AS grossWeight,
+            tare_weight AS tareWeight,
+            net_weight AS netWeight,
+            gross_weighed_at AS grossWeighedAt,
+            tare_weighed_at AS tareWeighedAt
+          FROM dbo.weighing_records
+          WHERE shipment_id = @shipmentId;
+        `);
+
+    const weighingRecord = updatedWeightResult.recordset[0];
+
+    if (!weighingRecord) {
+      throw new ShipmentWeightConflictError(
+        "Kantar kaydı oluşturulamadı.",
+        shipment.status,
+      );
+    }
+
+    await transaction.commit();
+    transactionStarted = false;
+
+    return weighingRecord;
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error("Weight transaction rollback failed:", rollbackError);
       }
     }
 

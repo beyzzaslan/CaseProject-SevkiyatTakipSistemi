@@ -264,3 +264,15 @@ h1 {
     flex: 1;
   }
 }
+
+.weightValues {
+  display: flex;
+  min-width: 125px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weightValues small {
+  color: #5f7387;
+  white-space: nowrap;
+}

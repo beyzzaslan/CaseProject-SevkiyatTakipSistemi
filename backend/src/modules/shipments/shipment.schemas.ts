@@ -15,3 +15,21 @@ export const adminUpdateShipmentStatusSchema = z
 export type AdminUpdateShipmentStatusInput = z.infer<
   typeof adminUpdateShipmentStatusSchema
 >;
+
+export const shipmentWeightSchema = z
+  .object({
+    weight: z
+      .number()
+      .positive(
+        "Ağırlık sıfırdan büyük olmalıdır.",
+      )
+      .max(
+        9999999999.99,
+        "Gönderilen ağırlık çok büyük.",
+      ),
+  })
+  .strict();
+
+export type ShipmentWeightInput = z.infer<
+  typeof shipmentWeightSchema
+>;

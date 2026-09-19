@@ -7,15 +7,18 @@ import {
 
 import {
   adminUpdateShipmentStatusSchema,
+  shipmentWeightSchema,
 } from "./shipment.schemas.js";
 
 import {
   ShipmentNotFoundError,
   ShipmentStatusConflictError,
   ShipmentStatusTransitionError,
+  ShipmentWeightConflictError,
   findActiveShipmentByDriverId,
   findAllActiveShipments,
   markShipmentAsArrived,
+  recordShipmentWeight,
   updateShipmentStatusByAdmin,
 } from "./shipment.service.js";
 
@@ -113,6 +116,17 @@ shipmentRouter.patch(
         return;
       }
 
+      if (
+  error instanceof
+  ShipmentWeightConflictError
+) {
+  response.status(409).json({
+    message: error.message,
+    currentStatus: error.currentStatus,
+  });
+  return;
+}
+
       console.error(
         "Admin shipment status update failed:",
         error,
@@ -126,6 +140,100 @@ shipmentRouter.patch(
   },
 );
 
+shipmentRouter.post(
+  "/admin/:shipmentId/weighing/:weightKind",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (request, response) => {
+    const shipmentId = Number(
+      request.params.shipmentId,
+    );
+
+    if (
+      !Number.isInteger(shipmentId) ||
+      shipmentId <= 0
+    ) {
+      response.status(400).json({
+        message:
+          "Geçerli bir sevkiyat numarası gönderilmelidir.",
+      });
+      return;
+    }
+
+    const weightKind =
+      request.params.weightKind;
+
+    if (
+      weightKind !== "gross" &&
+      weightKind !== "tare"
+    ) {
+      response.status(400).json({
+        message:
+          "Ağırlık türü gross veya tare olmalıdır.",
+      });
+      return;
+    }
+
+    const validationResult =
+      shipmentWeightSchema.safeParse(
+        request.body,
+      );
+
+    if (!validationResult.success) {
+      response.status(400).json({
+        message:
+          "Gönderilen ağırlık geçersiz.",
+        errors: validationResult.error.flatten(),
+      });
+      return;
+    }
+
+    try {
+      const weighingRecord =
+        await recordShipmentWeight(
+          shipmentId,
+          weightKind,
+          validationResult.data.weight,
+        );
+
+      response.status(200).json({
+        message:
+          weightKind === "gross"
+            ? "Brüt ağırlık kaydedildi."
+            : "Dara ağırlığı kaydedildi.",
+        weighingRecord,
+      });
+    } catch (error) {
+      if (error instanceof ShipmentNotFoundError) {
+        response.status(404).json({
+          message: error.message,
+        });
+        return;
+      }
+
+      if (
+        error instanceof
+        ShipmentWeightConflictError
+      ) {
+        response.status(409).json({
+          message: error.message,
+          currentStatus: error.currentStatus,
+        });
+        return;
+      }
+
+      console.error(
+        "Shipment weight request failed:",
+        error,
+      );
+
+      response.status(500).json({
+        message:
+          "Kantar ağırlığı kaydedilirken bir hata oluştu.",
+      });
+    }
+  },
+);
 
 shipmentRouter.get(
   "/active",
