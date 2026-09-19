@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
 
 import { getCurrentAdmin, loginAdmin } from "./services/authService";
+
 import {
   getAdminShipments,
+  getCompletedAdminShipments,
   recordAdminShipmentWeight,
   updateAdminShipmentStatus,
 } from "./services/shipmentService";
@@ -45,12 +47,22 @@ const actionLabels: Partial<Record<ShipmentStatus, string>> = {
   BOSALTIM_TAMAMLANDI: "Sevkiyatı Tamamla",
 };
 
+type ShipmentView = "active" | "completed";
+
 function formatWeight(weight: number | null): string {
   if (weight === null) {
     return "-";
   }
 
   return `${weight.toLocaleString("tr-TR")} kg`;
+}
+
+function formatDate(dateValue: string | null): string {
+  if (!dateValue) {
+    return "-";
+  }
+
+  return new Date(dateValue).toLocaleString("tr-TR");
 }
 
 function App() {
@@ -61,6 +73,12 @@ function App() {
   const [token, setToken] = useState("");
 
   const [shipments, setShipments] = useState<AdminShipment[]>([]);
+
+  const [completedShipments, setCompletedShipments] = useState<AdminShipment[]>(
+    [],
+  );
+
+  const [shipmentView, setShipmentView] = useState<ShipmentView>("active");
 
   const [loginError, setLoginError] = useState("");
   const [shipmentError, setShipmentError] = useState("");
@@ -83,9 +101,13 @@ function App() {
     }
 
     try {
-      const activeShipments = await getAdminShipments(authenticationToken);
+      const [activeShipments, completedShipmentList] = await Promise.all([
+        getAdminShipments(authenticationToken),
+        getCompletedAdminShipments(authenticationToken),
+      ]);
 
       setShipments(activeShipments);
+      setCompletedShipments(completedShipmentList);
     } catch (error) {
       setShipmentError(
         error instanceof Error ? error.message : "Sevkiyatlar alınamadı.",
@@ -235,8 +257,14 @@ function App() {
     setUser(null);
     setToken("");
     setShipments([]);
+    setCompletedShipments([]);
+    setShipmentView("active");
     setPassword("");
   }
+
+  const displayedShipments =
+    shipmentView === "active" ? shipments : completedShipments;
+
   if (isCheckingSession) {
     return (
       <main className="loginPage">
@@ -308,8 +336,11 @@ function App() {
         <div>
           <p className="eyebrow">FABRİKA SIRA SİSTEMİ</p>
 
-          <h1>Aktif Sevkiyatlar</h1>
-
+          <h1>
+            {shipmentView === "active"
+              ? "Aktif Sevkiyatlar"
+              : "Tamamlanan İşlemler"}
+          </h1>
           <p>Hoş geldiniz, {user.fullName}</p>
         </div>
 
@@ -329,24 +360,64 @@ function App() {
         </div>
       </header>
 
+      <nav className="shipmentTabs">
+        <button
+          type="button"
+          className={
+            shipmentView === "active"
+              ? "shipmentTab shipmentTabActive"
+              : "shipmentTab"
+          }
+          onClick={() => setShipmentView("active")}
+        >
+          Aktif Sevkiyatlar
+          <span>{shipments.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={
+            shipmentView === "completed"
+              ? "shipmentTab shipmentTabActive"
+              : "shipmentTab"
+          }
+          onClick={() => setShipmentView("completed")}
+        >
+          Tamamlanan İşlemler
+          <span>{completedShipments.length}</span>
+        </button>
+      </nav>
+
       {shipmentError && <p className="errorMessage">{shipmentError}</p>}
 
-      {isLoadingShipments && shipments.length === 0 ? (
+      {isLoadingShipments && displayedShipments.length === 0 ? (
         <section className="emptyCard">
           <h2>Sevkiyatlar yükleniyor...</h2>
         </section>
-      ) : shipments.length === 0 ? (
+      ) : displayedShipments.length === 0 ? (
         <section className="emptyCard">
-          <h2>Aktif sevkiyat bulunmuyor</h2>
-
-          <p>Yeni sevkiyat oluşturulduğunda burada görüntülenecek.</p>
+          <h2>
+            {shipmentView === "active"
+              ? "Aktif sevkiyat bulunmuyor"
+              : "Tamamlanan işlem bulunmuyor"}
+          </h2>
+          <p>
+            {shipmentView === "active"
+              ? "Yeni sevkiyat oluşturulduğunda burada görüntülenecek."
+              : "Tamamlanan sevkiyatlar burada görüntülenecek."}
+          </p>{" "}
         </section>
       ) : (
         <section className="tableCard">
           <div className="tableHeading">
             <div>
               <h2>Sevkiyat listesi</h2>
-              <p>Toplam {shipments.length} aktif sevkiyat</p>
+              <p>
+                Toplam {displayedShipments.length}{" "}
+                {shipmentView === "active"
+                  ? "aktif sevkiyat"
+                  : "tamamlanan işlem"}
+              </p>{" "}
             </div>
           </div>
 
@@ -360,12 +431,13 @@ function App() {
                   <th>Malzeme</th>
                   <th>Durum</th>
                   <th>Kantar</th>
+                  {shipmentView === "completed" && <th>Tamamlanma</th>}
                   <th>İşlem</th>
                 </tr>
               </thead>
 
               <tbody>
-                {shipments.map((shipment) => {
+                {displayedShipments.map((shipment) => {
                   const needsGrossWeight =
                     shipment.status === "KANTARDA" &&
                     shipment.grossWeight === null;
@@ -416,8 +488,16 @@ function App() {
                         </div>
                       </td>
 
+                      {shipmentView === "completed" && (
+                        <td>{formatDate(shipment.completedAt)}</td>
+                      )}
+
                       <td>
-                        {actionLabel ? (
+                        {shipmentView === "completed" ? (
+                          <span className="completedText">
+                            İşlem tamamlandı
+                          </span>
+                        ) : actionLabel ? (
                           <button
                             className="actionButton"
                             type="button"

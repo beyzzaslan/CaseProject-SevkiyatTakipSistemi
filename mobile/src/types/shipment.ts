@@ -21,3 +21,14 @@ export type ActiveShipment = {
 export type ActiveShipmentResponse = {
   shipment: ActiveShipment | null;
 };
+
+export type CompletedShipment = ActiveShipment & {
+  grossWeight: number | null;
+  tareWeight: number | null;
+  netWeight: number | null;
+  completedAt: string | null;
+};
+
+export type CompletedShipmentResponse = {
+  shipment: CompletedShipment | null;
+};

@@ -1,4 +1,9 @@
-import type { ActiveShipment, ActiveShipmentResponse } from "../types/shipment";
+import type {
+  ActiveShipment,
+  ActiveShipmentResponse,
+  CompletedShipment,
+  CompletedShipmentResponse,
+} from "../types/shipment";
 
 import { apiGet,apiPost } from "./api";
 
@@ -28,6 +33,18 @@ export async function markShipmentAsArrived(
   if (!response.shipment) {
     throw new Error("Güncel sevkiyat bilgisi alınamadı.");
   }
+
+  return response.shipment;
+}
+
+export async function getLatestCompletedShipment(
+  token: string,
+): Promise<CompletedShipment | null> {
+  const response =
+    await apiGet<CompletedShipmentResponse>(
+      "/shipments/completed/latest",
+      token,
+    );
 
   return response.shipment;
 }

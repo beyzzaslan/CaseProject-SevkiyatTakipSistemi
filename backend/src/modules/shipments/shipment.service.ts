@@ -29,7 +29,16 @@ export type AdminShipment = ActiveShipment & {
   grossWeight: number | null;
   tareWeight: number | null;
   netWeight: number | null;
+  completedAt: Date | null;
 };
+
+export type CompletedShipmentResult =
+  ActiveShipment & {
+    grossWeight: number | null;
+    tareWeight: number | null;
+    netWeight: number | null;
+    completedAt: Date | null;
+  };
 
 export type ShipmentWeightKind = "gross" | "tare";
 
@@ -70,6 +79,45 @@ export async function findActiveShipmentByDriverId(
 
   return shipmentResult.recordset[0] ?? null;
 }
+
+export async function findLatestCompletedShipmentByDriverId(
+  driverId: number,
+): Promise<CompletedShipmentResult | null> {
+  const pool = await getDatabasePool();
+
+  const shipmentResult = await pool
+    .request()
+    .input("driverId", sql.Int, driverId)
+    .query<CompletedShipmentResult>(`
+      SELECT TOP (1)
+        shipments.id,
+        shipments.vehicle_id AS vehicleId,
+        vehicles.plate_number AS plateNumber,
+        shipments.material_name AS materialName,
+        shipments.status,
+        shipments.queue_number AS queueNumber,
+        shipments.arrival_time AS arrivalTime,
+        shipments.created_at AS createdAt,
+        shipments.completed_at AS completedAt,
+        weighing.gross_weight AS grossWeight,
+        weighing.tare_weight AS tareWeight,
+        weighing.net_weight AS netWeight
+      FROM dbo.shipments AS shipments
+      INNER JOIN dbo.vehicles AS vehicles
+        ON vehicles.id = shipments.vehicle_id
+      LEFT JOIN dbo.weighing_records AS weighing
+        ON weighing.shipment_id = shipments.id
+      WHERE
+        vehicles.driver_id = @driverId
+        AND shipments.status = 'TAMAMLANDI'
+      ORDER BY
+        shipments.completed_at DESC,
+        shipments.id DESC;
+    `);
+
+  return shipmentResult.recordset[0] ?? null;
+}
+
 export class ShipmentNotFoundError extends Error {
   constructor() {
     super("Sevkiyat bulunamadı.");
@@ -240,21 +288,22 @@ export async function findAllActiveShipments(): Promise<AdminShipment[]> {
         shipments.queue_number AS queueNumber,
         shipments.arrival_time AS arrivalTime,
         shipments.created_at AS createdAt,
-       users.id AS driverId,
-users.full_name AS driverName,
-users.email AS driverEmail,
-weighing.gross_weight AS grossWeight,
-weighing.tare_weight AS tareWeight,
-weighing.net_weight AS netWeight
-      FROM dbo.shipments AS shipments
-      INNER JOIN dbo.vehicles AS vehicles
+        shipments.completed_at AS completedAt,
+        users.id AS driverId,
+        users.full_name AS driverName,
+        users.email AS driverEmail,
+        weighing.gross_weight AS grossWeight,
+        weighing.tare_weight AS tareWeight,
+        weighing.net_weight AS netWeight
+        FROM dbo.shipments AS shipments
+        INNER JOIN dbo.vehicles AS vehicles
         ON vehicles.id = shipments.vehicle_id
-     INNER JOIN dbo.users AS users
-  ON users.id = vehicles.driver_id
-LEFT JOIN dbo.weighing_records AS weighing
-  ON weighing.shipment_id = shipments.id
-WHERE shipments.status <> 'TAMAMLANDI'
-      ORDER BY
+        INNER JOIN dbo.users AS users
+        ON users.id = vehicles.driver_id
+        LEFT JOIN dbo.weighing_records AS weighing
+        ON weighing.shipment_id = shipments.id
+        WHERE shipments.status <> 'TAMAMLANDI'
+        ORDER BY
         CASE
           WHEN shipments.status = 'YOLDA' THEN 1
           ELSE 0
@@ -265,6 +314,48 @@ WHERE shipments.status <> 'TAMAMLANDI'
 
   return shipmentResult.recordset;
 }
+
+export async function findAllCompletedShipments(): Promise<
+  AdminShipment[]
+> {
+  const pool = await getDatabasePool();
+
+  const shipmentResult = await pool
+    .request()
+    .query<AdminShipment>(`
+      SELECT
+        shipments.id,
+        shipments.vehicle_id AS vehicleId,
+        vehicles.plate_number AS plateNumber,
+        shipments.material_name AS materialName,
+        shipments.status,
+        shipments.queue_number AS queueNumber,
+        shipments.arrival_time AS arrivalTime,
+        shipments.created_at AS createdAt,
+        shipments.completed_at AS completedAt,
+        users.id AS driverId,
+        users.full_name AS driverName,
+        users.email AS driverEmail,
+        weighing.gross_weight AS grossWeight,
+        weighing.tare_weight AS tareWeight,
+        weighing.net_weight AS netWeight
+      FROM dbo.shipments AS shipments
+      INNER JOIN dbo.vehicles AS vehicles
+        ON vehicles.id = shipments.vehicle_id
+      INNER JOIN dbo.users AS users
+        ON users.id = vehicles.driver_id
+      LEFT JOIN dbo.weighing_records AS weighing
+        ON weighing.shipment_id = shipments.id
+      WHERE shipments.status = 'TAMAMLANDI'
+      ORDER BY
+        shipments.completed_at DESC,
+        shipments.id DESC;
+    `);
+
+  return shipmentResult.recordset;
+}
+
+
 
 export async function updateShipmentStatusByAdmin(
   shipmentId: number,

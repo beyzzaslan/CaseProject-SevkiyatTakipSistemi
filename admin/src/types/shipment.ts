@@ -27,8 +27,9 @@ export type AdminShipment = {
   driverName: string;
   driverEmail: string;
   grossWeight: number | null;
-tareWeight: number | null;
-netWeight: number | null;
+  tareWeight: number | null;
+  netWeight: number | null;
+  completedAt: string | null;
 };
 
 export type AdminShipmentListResponse = {

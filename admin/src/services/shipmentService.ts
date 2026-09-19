@@ -25,6 +25,22 @@ export async function getAdminShipments(
 
   return response.shipments;
 }
+export async function getCompletedAdminShipments(
+  token: string,
+): Promise<AdminShipment[]> {
+  const response =
+    await apiRequest<AdminShipmentListResponse>(
+      "/shipments/admin/completed",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+  return response.shipments;
+}
+
 
 export async function updateAdminShipmentStatus(
   shipmentId: number,

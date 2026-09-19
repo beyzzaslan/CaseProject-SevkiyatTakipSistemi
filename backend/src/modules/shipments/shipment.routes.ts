@@ -17,6 +17,8 @@ import {
   ShipmentWeightConflictError,
   findActiveShipmentByDriverId,
   findAllActiveShipments,
+  findAllCompletedShipments,
+  findLatestCompletedShipmentByDriverId,
   markShipmentAsArrived,
   recordShipmentWeight,
   updateShipmentStatusByAdmin,
@@ -50,6 +52,32 @@ shipmentRouter.get(
     }
   },
 );
+shipmentRouter.get(
+  "/admin/completed",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (_request, response) => {
+    try {
+      const shipments =
+        await findAllCompletedShipments();
+
+      response.status(200).json({
+        shipments,
+      });
+    } catch (error) {
+      console.error(
+        "Completed shipment list request failed:",
+        error,
+      );
+
+      response.status(500).json({
+        message:
+          "Tamamlanan sevkiyatlar alınırken bir hata oluştu.",
+      });
+    }
+  },
+);
+
 shipmentRouter.patch(
   "/admin/:shipmentId/status",
   requireAuth,
@@ -269,6 +297,51 @@ shipmentRouter.get(
       response.status(500).json({
         message:
           "Aktif sevkiyat alınırken bir hata oluştu.",
+      });
+    }
+  },
+);
+
+shipmentRouter.get(
+  "/completed/latest",
+  requireAuth,
+  async (request, response) => {
+    const auth = request.auth;
+
+    if (!auth) {
+      response.status(401).json({
+        message:
+          "Bu işlem için giriş yapmalısınız.",
+      });
+      return;
+    }
+
+    if (auth.role !== "DRIVER") {
+      response.status(403).json({
+        message:
+          "Bu işlem yalnızca şoförler içindir.",
+      });
+      return;
+    }
+
+    try {
+      const shipment =
+        await findLatestCompletedShipmentByDriverId(
+          auth.userId,
+        );
+
+      response.status(200).json({
+        shipment,
+      });
+    } catch (error) {
+      console.error(
+        "Completed shipment result request failed:",
+        error,
+      );
+
+      response.status(500).json({
+        message:
+          "Tamamlanan sevkiyat sonucu alınırken bir hata oluştu.",
       });
     }
   },

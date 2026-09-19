@@ -13,11 +13,15 @@ import type { RootStackParamList } from "../navigation/types";
 import { ApiError } from "../services/api";
 import {
   getActiveShipment,
+  getLatestCompletedShipment,
   markShipmentAsArrived,
 } from "../services/shipmentService";
 import { deleteSession, getSession } from "../services/sessionStorage";
-import type { ActiveShipment, ShipmentStatus } from "../types/shipment";
-
+import type {
+  ActiveShipment,
+  CompletedShipment,
+  ShipmentStatus,
+} from "../types/shipment";
 type DriverHomeScreenProps = NativeStackScreenProps<
   RootStackParamList,
   "DriverHome"
@@ -41,12 +45,25 @@ const STATUS_DESCRIPTIONS: Record<ShipmentStatus, string> = {
   BOSALTIM_TAMAMLANDI: "Boşaltım tamamlandı. Son işlemler yapılıyor.",
   TAMAMLANDI: "Sevkiyat işleminiz tamamlandı.",
 };
+
+function formatWeight(weight: number | null): string {
+  if (weight === null) {
+    return "-";
+  }
+
+  return `${weight.toLocaleString("tr-TR")} kg`;
+}
+
 export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
   const { user } = route.params;
 
   const [activeShipment, setActiveShipment] = useState<ActiveShipment | null>(
     null,
   );
+
+  const [completedShipment, setCompletedShipment] =
+    useState<CompletedShipment | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMarkingArrived, setIsMarkingArrived] = useState(false);
@@ -72,6 +89,16 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
         const shipment = await getActiveShipment(session.token);
 
         setActiveShipment(shipment);
+
+        if (shipment) {
+          setCompletedShipment(null);
+        } else {
+          const latestCompletedShipment = await getLatestCompletedShipment(
+            session.token,
+          );
+
+          setCompletedShipment(latestCompletedShipment);
+        }
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           await deleteSession();
@@ -197,8 +224,13 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
       </View>
 
       <View style={styles.statusCard}>
-        <Text style={styles.statusLabel}>Aktif sevkiyat</Text>
-
+        <Text style={styles.statusLabel}>
+          {activeShipment
+            ? "Aktif sevkiyat"
+            : completedShipment
+              ? "İşlem sonucu"
+              : "Aktif sevkiyat"}
+        </Text>
         {isLoading ? (
           <View style={styles.centeredContent}>
             <ActivityIndicator size="large" color="#17324D" />
@@ -263,6 +295,58 @@ export function DriverHomeScreen({ navigation, route }: DriverHomeScreenProps) {
                 </Text>
               </Pressable>
             )}
+          </View>
+        ) : completedShipment ? (
+          <View>
+            <View style={styles.completedBadge}>
+              <Text style={styles.completedBadgeText}>Tamamlandı</Text>
+            </View>
+
+            <Text style={styles.resultTitle}>Teslimat tamamlandı</Text>
+
+            <Text style={styles.resultDescription}>
+              Tartım ve boşaltım işlemleriniz başarıyla tamamlandı.
+            </Text>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Malzeme</Text>
+
+              <Text style={styles.infoValue}>
+                {completedShipment.materialName}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Plaka</Text>
+
+              <Text style={styles.infoValue}>
+                {completedShipment.plateNumber}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Brüt ağırlık</Text>
+
+              <Text style={styles.infoValue}>
+                {formatWeight(completedShipment.grossWeight)}
+              </Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Dara ağırlığı</Text>
+
+              <Text style={styles.infoValue}>
+                {formatWeight(completedShipment.tareWeight)}
+              </Text>
+            </View>
+
+            <View style={styles.netWeightRow}>
+              <Text style={styles.netWeightLabel}>Net teslim miktarı</Text>
+
+              <Text style={styles.netWeightValue}>
+                {formatWeight(completedShipment.netWeight)}
+              </Text>
+            </View>
           </View>
         ) : (
           <View>
@@ -425,5 +509,52 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 8,
     textAlign: "center",
+  },
+
+  completedBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#E7F6EC",
+    borderRadius: 20,
+    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  completedBadgeText: {
+    color: "#18794E",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  resultTitle: {
+    color: "#17324D",
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 16,
+  },
+  resultDescription: {
+    color: "#5F6F7E",
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  netWeightRow: {
+    alignItems: "center",
+    backgroundColor: "#E8F1FA",
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+  },
+  netWeightLabel: {
+    color: "#17324D",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  netWeightValue: {
+    color: "#17324D",
+    fontSize: 19,
+    fontWeight: "800",
   },
 });
