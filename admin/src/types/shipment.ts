@@ -36,6 +36,23 @@ export type AdminShipmentListResponse = {
   shipments: AdminShipment[];
 };
 
+export type AvailableVehicle = {
+  vehicleId: number;
+  plateNumber: string;
+  driverId: number;
+  driverName: string;
+  driverEmail: string;
+};
+
+export type AvailableVehicleListResponse = {
+  vehicles: AvailableVehicle[];
+};
+
+export type CreateShipmentResponse = {
+  message: string;
+  shipment: AdminShipment;
+};
+
 export type UpdateShipmentStatusResponse = {
   message: string;
   shipment: {

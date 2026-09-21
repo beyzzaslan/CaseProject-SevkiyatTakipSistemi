@@ -6,25 +6,87 @@ import {
 } from "../../middleware/auth.middleware.js";
 
 import {
+  adminCreateShipmentSchema,
   adminUpdateShipmentStatusSchema,
   shipmentWeightSchema,
 } from "./shipment.schemas.js";
 
 import {
+  ActiveShipmentAlreadyExistsError,
   ShipmentNotFoundError,
   ShipmentStatusConflictError,
   ShipmentStatusTransitionError,
   ShipmentWeightConflictError,
+  ShipmentVehicleNotFoundError,
+  createShipmentByAdmin,
   findActiveShipmentByDriverId,
   findAllActiveShipments,
   findAllCompletedShipments,
   findLatestCompletedShipmentByDriverId,
+  findVehiclesAvailableForShipment,
   markShipmentAsArrived,
   recordShipmentWeight,
   updateShipmentStatusByAdmin,
 } from "./shipment.service.js";
 
 export const shipmentRouter = Router();
+
+shipmentRouter.get(
+  "/admin/available-vehicles",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (_request, response) => {
+    try {
+      const vehicles = await findVehiclesAvailableForShipment();
+      response.status(200).json({ vehicles });
+    } catch (error) {
+      console.error("Available vehicle list request failed:", error);
+      response.status(500).json({
+        message: "Sevkiyat atanabilecek araçlar alınırken bir hata oluştu.",
+      });
+    }
+  },
+);
+
+shipmentRouter.post(
+  "/admin",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (request, response) => {
+    const validationResult = adminCreateShipmentSchema.safeParse(request.body);
+
+    if (!validationResult.success) {
+      response.status(400).json({
+        message: "Gönderilen sevkiyat bilgileri geçersiz.",
+        errors: validationResult.error.flatten(),
+      });
+      return;
+    }
+
+    try {
+      const shipment = await createShipmentByAdmin(validationResult.data);
+      response.status(201).json({
+        message: "Sevkiyat başarıyla oluşturuldu.",
+        shipment,
+      });
+    } catch (error) {
+      if (error instanceof ShipmentVehicleNotFoundError) {
+        response.status(404).json({ message: error.message });
+        return;
+      }
+
+      if (error instanceof ActiveShipmentAlreadyExistsError) {
+        response.status(409).json({ message: error.message });
+        return;
+      }
+
+      console.error("Admin shipment creation failed:", error);
+      response.status(500).json({
+        message: "Sevkiyat oluşturulurken bir hata oluştu.",
+      });
+    }
+  },
+);
 
 shipmentRouter.get(
   "/admin/active",

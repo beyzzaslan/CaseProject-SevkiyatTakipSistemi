@@ -1,7 +1,10 @@
 import sql from "mssql";
 
 import { getDatabasePool } from "../../database/connection.js";
-import type { AdminUpdateShipmentStatusInput } from "./shipment.schemas.js";
+import type {
+  AdminCreateShipmentInput,
+  AdminUpdateShipmentStatusInput,
+} from "./shipment.schemas.js";
 export type ShipmentStatus =
   | "YOLDA"
   | "SIRADA"
@@ -30,6 +33,14 @@ export type AdminShipment = ActiveShipment & {
   tareWeight: number | null;
   netWeight: number | null;
   completedAt: Date | null;
+};
+
+export type AvailableVehicle = {
+  vehicleId: number;
+  plateNumber: string;
+  driverId: number;
+  driverName: string;
+  driverEmail: string;
 };
 
 export type CompletedShipmentResult =
@@ -152,6 +163,20 @@ export class ShipmentWeightConflictError extends Error {
   ) {
     super(message);
     this.name = "ShipmentWeightConflictError";
+  }
+}
+
+export class ShipmentVehicleNotFoundError extends Error {
+  constructor() {
+    super("Seçilen şoför aracı bulunamadı.");
+    this.name = "ShipmentVehicleNotFoundError";
+  }
+}
+
+export class ActiveShipmentAlreadyExistsError extends Error {
+  constructor() {
+    super("Bu aracın zaten aktif bir sevkiyatı bulunuyor.");
+    this.name = "ActiveShipmentAlreadyExistsError";
   }
 }
 
@@ -353,6 +378,149 @@ export async function findAllCompletedShipments(): Promise<
     `);
 
   return shipmentResult.recordset;
+}
+
+export async function findVehiclesAvailableForShipment(): Promise<
+  AvailableVehicle[]
+> {
+  const pool = await getDatabasePool();
+
+  const vehicleResult = await pool.request().query<AvailableVehicle>(`
+    SELECT
+      vehicles.id AS vehicleId,
+      vehicles.plate_number AS plateNumber,
+      users.id AS driverId,
+      users.full_name AS driverName,
+      users.email AS driverEmail
+    FROM dbo.vehicles AS vehicles
+    INNER JOIN dbo.users AS users
+      ON users.id = vehicles.driver_id
+    WHERE
+      users.role = 'DRIVER'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM dbo.shipments AS shipments
+        WHERE
+          shipments.vehicle_id = vehicles.id
+          AND shipments.status <> 'TAMAMLANDI'
+      )
+    ORDER BY users.full_name, vehicles.plate_number;
+  `);
+
+  return vehicleResult.recordset;
+}
+
+export async function createShipmentByAdmin(
+  data: AdminCreateShipmentInput,
+): Promise<AdminShipment> {
+  const pool = await getDatabasePool();
+  const transaction = new sql.Transaction(pool);
+  let transactionStarted = false;
+
+  try {
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    transactionStarted = true;
+
+    const vehicleResult = await new sql.Request(transaction)
+      .input("vehicleId", sql.Int, data.vehicleId)
+      .query<{ vehicleId: number }>(`
+        SELECT vehicles.id AS vehicleId
+        FROM dbo.vehicles AS vehicles WITH (UPDLOCK, HOLDLOCK)
+        INNER JOIN dbo.users AS users
+          ON users.id = vehicles.driver_id
+        WHERE
+          vehicles.id = @vehicleId
+          AND users.role = 'DRIVER';
+      `);
+
+    if (!vehicleResult.recordset[0]) {
+      throw new ShipmentVehicleNotFoundError();
+    }
+
+    const activeShipmentResult = await new sql.Request(transaction)
+      .input("vehicleId", sql.Int, data.vehicleId)
+      .query<{ id: number }>(`
+        SELECT TOP (1) id
+        FROM dbo.shipments WITH (UPDLOCK, HOLDLOCK)
+        WHERE
+          vehicle_id = @vehicleId
+          AND status <> 'TAMAMLANDI';
+      `);
+
+    if (activeShipmentResult.recordset[0]) {
+      throw new ActiveShipmentAlreadyExistsError();
+    }
+
+    const insertedShipmentResult = await new sql.Request(transaction)
+      .input("vehicleId", sql.Int, data.vehicleId)
+      .input("materialName", sql.NVarChar(150), data.materialName)
+      .query<{ id: number }>(`
+        INSERT INTO dbo.shipments (
+          vehicle_id,
+          material_name,
+          status
+        )
+        OUTPUT INSERTED.id
+        VALUES (
+          @vehicleId,
+          @materialName,
+          'YOLDA'
+        );
+      `);
+
+    const shipmentId = insertedShipmentResult.recordset[0]?.id;
+
+    if (!shipmentId) {
+      throw new Error("Sevkiyat kaydı oluşturulamadı.");
+    }
+
+    const createdShipmentResult = await new sql.Request(transaction)
+      .input("shipmentId", sql.Int, shipmentId)
+      .query<AdminShipment>(`
+        SELECT TOP (1)
+          shipments.id,
+          shipments.vehicle_id AS vehicleId,
+          vehicles.plate_number AS plateNumber,
+          shipments.material_name AS materialName,
+          shipments.status,
+          shipments.queue_number AS queueNumber,
+          shipments.arrival_time AS arrivalTime,
+          shipments.created_at AS createdAt,
+          shipments.completed_at AS completedAt,
+          users.id AS driverId,
+          users.full_name AS driverName,
+          users.email AS driverEmail,
+          CAST(NULL AS DECIMAL(12, 2)) AS grossWeight,
+          CAST(NULL AS DECIMAL(12, 2)) AS tareWeight,
+          CAST(NULL AS DECIMAL(12, 2)) AS netWeight
+        FROM dbo.shipments AS shipments
+        INNER JOIN dbo.vehicles AS vehicles
+          ON vehicles.id = shipments.vehicle_id
+        INNER JOIN dbo.users AS users
+          ON users.id = vehicles.driver_id
+        WHERE shipments.id = @shipmentId;
+      `);
+
+    const createdShipment = createdShipmentResult.recordset[0];
+
+    if (!createdShipment) {
+      throw new Error("Oluşturulan sevkiyat okunamadı.");
+    }
+
+    await transaction.commit();
+    transactionStarted = false;
+    return createdShipment;
+  } catch (error) {
+    if (transactionStarted) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error("Shipment creation rollback failed:", rollbackError);
+      }
+    }
+
+    throw error;
+  }
 }
 
 

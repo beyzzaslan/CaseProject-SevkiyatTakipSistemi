@@ -4,7 +4,9 @@ import "./App.css";
 import { getCurrentAdmin, loginAdmin } from "./services/authService";
 
 import {
+  createAdminShipment,
   getAdminShipments,
+  getAvailableVehicles,
   getCompletedAdminShipments,
   recordAdminShipmentWeight,
   updateAdminShipmentStatus,
@@ -15,6 +17,7 @@ import type { AuthUser } from "./types/auth";
 import type {
   AdminManagedShipmentStatus,
   AdminShipment,
+  AvailableVehicle,
   ShipmentStatus,
   ShipmentWeightKind,
 } from "./types/shipment";
@@ -78,17 +81,36 @@ function App() {
     [],
   );
 
+  const [availableVehicles, setAvailableVehicles] = useState<
+    AvailableVehicle[]
+  >([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [materialName, setMaterialName] = useState("");
+
   const [shipmentView, setShipmentView] = useState<ShipmentView>("active");
 
   const [loginError, setLoginError] = useState("");
   const [shipmentError, setShipmentError] = useState("");
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isCheckingSession, setIsCheckingSession] = useState(() =>
+    Boolean(localStorage.getItem("adminToken")),
+  );
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoadingShipments, setIsLoadingShipments] = useState(false);
+  const [isCreatingShipment, setIsCreatingShipment] = useState(false);
 
   const [updatingShipmentId, setUpdatingShipmentId] = useState<number | null>(
     null,
   );
+
+  const effectiveSelectedVehicleId =
+    selectedVehicleId &&
+    availableVehicles.some(
+      (vehicle) => String(vehicle.vehicleId) === selectedVehicleId,
+    )
+      ? selectedVehicleId
+      : availableVehicles[0]
+        ? String(availableVehicles[0].vehicleId)
+        : "";
 
   async function loadShipments(
     authenticationToken: string,
@@ -101,13 +123,16 @@ function App() {
     }
 
     try {
-      const [activeShipments, completedShipmentList] = await Promise.all([
+      const [activeShipments, completedShipmentList, vehicleList] =
+        await Promise.all([
         getAdminShipments(authenticationToken),
         getCompletedAdminShipments(authenticationToken),
-      ]);
+          getAvailableVehicles(authenticationToken),
+        ]);
 
       setShipments(activeShipments);
       setCompletedShipments(completedShipmentList);
+      setAvailableVehicles(vehicleList);
     } catch (error) {
       setShipmentError(
         error instanceof Error ? error.message : "Sevkiyatlar alınamadı.",
@@ -123,7 +148,6 @@ function App() {
     const storedToken = localStorage.getItem("adminToken");
 
     if (!storedToken) {
-      setIsCheckingSession(false);
       return;
     }
 
@@ -212,6 +236,46 @@ function App() {
     }
   }
 
+  async function handleCreateShipment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const vehicleId = Number(effectiveSelectedVehicleId);
+    const normalizedMaterialName = materialName.trim();
+
+    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
+      setShipmentError("Sevkiyat atanacak aracı seçin.");
+      return;
+    }
+
+    if (normalizedMaterialName.length < 2) {
+      setShipmentError("Malzeme adı en az 2 karakter olmalıdır.");
+      return;
+    }
+
+    setShipmentError("");
+    setIsCreatingShipment(true);
+
+    try {
+      await createAdminShipment(
+        vehicleId,
+        normalizedMaterialName,
+        token,
+      );
+
+      setMaterialName("");
+      await loadShipments(token);
+      setShipmentView("active");
+    } catch (error) {
+      setShipmentError(
+        error instanceof Error
+          ? error.message
+          : "Sevkiyat oluşturulamadı.",
+      );
+    } finally {
+      setIsCreatingShipment(false);
+    }
+  }
+
   async function handleWeightEntry(
     shipment: AdminShipment,
     kind: ShipmentWeightKind,
@@ -258,6 +322,9 @@ function App() {
     setToken("");
     setShipments([]);
     setCompletedShipments([]);
+    setAvailableVehicles([]);
+    setSelectedVehicleId("");
+    setMaterialName("");
     setShipmentView("active");
     setPassword("");
   }
@@ -359,6 +426,62 @@ function App() {
           </button>
         </div>
       </header>
+
+      <section className="createShipmentCard">
+        <div className="createShipmentHeading">
+          <div>
+            <p className="eyebrow">SEVKİYAT ATAMA</p>
+            <h2>Yeni sevkiyat oluştur</h2>
+          </div>
+
+          <p>
+            Kayıtlı şoförün aracını seçin ve taşıdığı malzemeyi yazın.
+          </p>
+        </div>
+
+        {availableVehicles.length === 0 ? (
+          <p className="assignmentEmptyMessage">
+            Şu anda sevkiyat atanabilecek boşta araç bulunmuyor.
+          </p>
+        ) : (
+          <form className="createShipmentForm" onSubmit={handleCreateShipment}>
+            <label>
+              Şoför ve araç
+              <select
+                value={effectiveSelectedVehicleId}
+                onChange={(event) => setSelectedVehicleId(event.target.value)}
+                required
+              >
+                {availableVehicles.map((vehicle) => (
+                  <option key={vehicle.vehicleId} value={vehicle.vehicleId}>
+                    {vehicle.driverName} - {vehicle.plateNumber}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Malzeme
+              <input
+                type="text"
+                value={materialName}
+                onChange={(event) => setMaterialName(event.target.value)}
+                placeholder="Örn. Çimento, kum, demir cevheri"
+                maxLength={150}
+                required
+              />
+            </label>
+
+            <button
+              className="createShipmentButton"
+              type="submit"
+              disabled={isCreatingShipment}
+            >
+              {isCreatingShipment ? "Oluşturuluyor..." : "Sevkiyat Oluştur"}
+            </button>
+          </form>
+        )}
+      </section>
 
       <nav className="shipmentTabs">
         <button

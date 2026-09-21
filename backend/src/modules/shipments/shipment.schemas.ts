@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+export const adminCreateShipmentSchema = z
+  .object({
+    vehicleId: z.number().int().positive(),
+    materialName: z
+      .string()
+      .trim()
+      .min(2, "Malzeme adı en az 2 karakter olmalıdır.")
+      .max(150, "Malzeme adı en fazla 150 karakter olabilir."),
+  })
+  .strict();
+
+export type AdminCreateShipmentInput = z.infer<
+  typeof adminCreateShipmentSchema
+>;
+
 export const adminUpdateShipmentStatusSchema = z
   .object({
     status: z.enum([

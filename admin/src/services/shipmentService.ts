@@ -2,6 +2,9 @@ import type {
   AdminManagedShipmentStatus,
   AdminShipment,
   AdminShipmentListResponse,
+  AvailableVehicle,
+  AvailableVehicleListResponse,
+  CreateShipmentResponse,
   UpdateShipmentStatusResponse,
   ShipmentWeightKind,
 ShipmentWeightResponse,
@@ -39,6 +42,41 @@ export async function getCompletedAdminShipments(
     );
 
   return response.shipments;
+}
+
+export async function getAvailableVehicles(
+  token: string,
+): Promise<AvailableVehicle[]> {
+  const response = await apiRequest<AvailableVehicleListResponse>(
+    "/shipments/admin/available-vehicles",
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  return response.vehicles;
+}
+
+export async function createAdminShipment(
+  vehicleId: number,
+  materialName: string,
+  token: string,
+): Promise<CreateShipmentResponse> {
+  return apiRequest<CreateShipmentResponse>(
+    "/shipments/admin",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        vehicleId,
+        materialName,
+      }),
+    },
+  );
 }
 
 
